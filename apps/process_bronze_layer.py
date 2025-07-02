@@ -6,12 +6,30 @@ from pyspark.sql import SparkSession
 from pyspark.sql.types import StructField, StructType, StringType, DoubleType, TimestampType
 from delta.pip_utils import configure_spark_with_delta_pip
 from constant import constants
+from pystyle import Colors, Colorate
 
 
 def main():
     '''
         the main entry point for the application
     '''
+
+    print(Colorate.Vertical(Colors.blue_to_green, """
+
+
+▀█████████▄     ▄████████  ▄██████▄  ███▄▄▄▄    ▄███████▄     ▄████████       ▄█          ▄████████ ▄██   ▄      ▄████████    ▄████████ 
+  ███    ███   ███    ███ ███    ███ ███▀▀▀██▄ ██▀     ▄██   ███    ███      ███         ███    ███ ███   ██▄   ███    ███   ███    ███ 
+  ███    ███   ███    ███ ███    ███ ███   ███       ▄███▀   ███    █▀       ███         ███    ███ ███▄▄▄███   ███    █▀    ███    ███ 
+ ▄███▄▄▄██▀   ▄███▄▄▄▄██▀ ███    ███ ███   ███  ▀█▀▄███▀▄▄  ▄███▄▄▄          ███         ███    ███ ▀▀▀▀▀▀███  ▄███▄▄▄      ▄███▄▄▄▄██▀ 
+▀▀███▀▀▀██▄  ▀▀███▀▀▀▀▀   ███    ███ ███   ███   ▄███▀   ▀ ▀▀███▀▀▀          ███       ▀███████████ ▄██   ███ ▀▀███▀▀▀     ▀▀███▀▀▀▀▀   
+  ███    ██▄ ▀███████████ ███    ███ ███   ███ ▄███▀         ███    █▄       ███         ███    ███ ███   ███   ███    █▄  ▀███████████ 
+  ███    ███   ███    ███ ███    ███ ███   ███ ███▄     ▄█   ███    ███      ███▌    ▄   ███    ███ ███   ███   ███    ███   ███    ███ 
+▄█████████▀    ███    ███  ▀██████▀   ▀█   █▀   ▀████████▀   ██████████      █████▄▄██   ███    █▀   ▀█████▀    ██████████   ███    ███ 
+               ███    ███                                                    ▀                                               ███    ███ 
+
+
+    """, 1))
+
 
     # Initialize SparkSession
     spark = (
@@ -25,11 +43,11 @@ def main():
     spark = configure_spark_with_delta_pip(spark).getOrCreate()
     spark.conf.set("spark.sql.debug.maxToStringFields", 1000)
 
-    print("""
-        # ********************************************************************************
-        # 1. BRONZE LAYER PROCESSING: Convert CSV to Delta Format
-        # ********************************************************************************
-        """)
+    
+    print("{:*<120}".format("*"))
+    print("{: ^120}".format("1. BRONZE LAYER PROCESSING: Convert CSV to Delta Format"))
+    print("{:*<120}".format("*"))
+
     if os.path.exists(constants.BRONZE_INPUT_FILE_PATH):
         print("Bronze layer: input file exists")
 

@@ -4,3 +4,4 @@ pandas
 pyspark==3.5.5
 delta-spark
 streamlit
+pystyle

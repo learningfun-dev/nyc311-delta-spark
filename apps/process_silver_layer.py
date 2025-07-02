@@ -6,6 +6,7 @@ from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, to_timestamp, month, year
 from delta.pip_utils import configure_spark_with_delta_pip
 from constant import constants
+from pystyle import Colors, Colorate
 
 
 def main():
@@ -13,6 +14,20 @@ def main():
         the main entry point for the application
     '''
 
+    print(Colorate.Vertical(Colors.blue_to_green, """
+
+
+   ▄████████  ▄█   ▄█        ▄█    █▄     ▄████████    ▄████████       ▄█          ▄████████ ▄██   ▄      ▄████████    ▄████████ 
+  ███    ███ ███  ███       ███    ███   ███    ███   ███    ███      ███         ███    ███ ███   ██▄   ███    ███   ███    ███ 
+  ███    █▀  ███▌ ███       ███    ███   ███    █▀    ███    ███      ███         ███    ███ ███▄▄▄███   ███    █▀    ███    ███ 
+  ███        ███▌ ███       ███    ███  ▄███▄▄▄      ▄███▄▄▄▄██▀      ███         ███    ███ ▀▀▀▀▀▀███  ▄███▄▄▄      ▄███▄▄▄▄██▀ 
+▀███████████ ███▌ ███       ███    ███ ▀▀███▀▀▀     ▀▀███▀▀▀▀▀        ███       ▀███████████ ▄██   ███ ▀▀███▀▀▀     ▀▀███▀▀▀▀▀   
+         ███ ███  ███       ███    ███   ███    █▄  ▀███████████      ███         ███    ███ ███   ███   ███    █▄  ▀███████████ 
+   ▄█    ███ ███  ███▌    ▄ ███    ███   ███    ███   ███    ███      ███▌    ▄   ███    ███ ███   ███   ███    ███   ███    ███ 
+ ▄████████▀  █▀   █████▄▄██  ▀██████▀    ██████████   ███    ███      █████▄▄██   ███    █▀   ▀█████▀    ██████████   ███    ███ 
+                  ▀                                   ███    ███      ▀                                               ███    ███ 
+
+    """, 1))
     # Initialize SparkSession
     spark = (
     SparkSession
@@ -24,12 +39,10 @@ def main():
 
     spark = configure_spark_with_delta_pip(spark).getOrCreate()
     spark.conf.set("spark.sql.debug.maxToStringFields", 1000)
-    
-    print("""
-        # ********************************************************************************
-        # 2. SILVER LAYER PROCESSING: Data Cleaning and adding columns
-        # ********************************************************************************
-        """)
+
+    print("{:*<120}".format("*"))
+    print("{: ^120}".format("2. SILVER LAYER PROCESSING: Data Cleaning and adding columns"))
+    print("{:*<120}".format("*"))
 
     if os.path.exists(constants.SILVER_INPUT_FILE_PATH):
         print("Silver layer: input file exists")

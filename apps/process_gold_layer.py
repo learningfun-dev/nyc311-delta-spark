@@ -6,12 +6,29 @@ from pyspark.sql import SparkSession
 from pyspark.sql.functions import col
 from delta.pip_utils import configure_spark_with_delta_pip
 from constant import constants
+from pystyle import Colors, Colorate
 
 
 def main():
     '''
         the main entry point for the application
     '''
+
+    print(Colorate.Vertical(Colors.blue_to_green, """
+
+
+   ▄██████▄   ▄██████▄   ▄█       ████████▄        ▄█          ▄████████ ▄██   ▄      ▄████████    ▄████████ 
+  ███    ███ ███    ███ ███       ███   ▀███      ███         ███    ███ ███   ██▄   ███    ███   ███    ███ 
+  ███    █▀  ███    ███ ███       ███    ███      ███         ███    ███ ███▄▄▄███   ███    █▀    ███    ███ 
+ ▄███        ███    ███ ███       ███    ███      ███         ███    ███ ▀▀▀▀▀▀███  ▄███▄▄▄      ▄███▄▄▄▄██▀ 
+▀▀███ ████▄  ███    ███ ███       ███    ███      ███       ▀███████████ ▄██   ███ ▀▀███▀▀▀     ▀▀███▀▀▀▀▀   
+  ███    ███ ███    ███ ███       ███    ███      ███         ███    ███ ███   ███   ███    █▄  ▀███████████ 
+  ███    ███ ███    ███ ███▌    ▄ ███   ▄███      ███▌    ▄   ███    ███ ███   ███   ███    ███   ███    ███ 
+  ████████▀   ▀██████▀  █████▄▄██ ████████▀       █████▄▄██   ███    █▀   ▀█████▀    ██████████   ███    ███ 
+                        ▀                         ▀                                               ███    ███ 
+
+
+    """, 1))
 
     # Initialize SparkSession
     spark = (
@@ -25,11 +42,10 @@ def main():
     spark = configure_spark_with_delta_pip(spark).getOrCreate()
     spark.conf.set("spark.sql.debug.maxToStringFields", 1000)
 
-    print("""
-        # ********************************************************************************
-        # 3. GOLD LAYER PROCESSING: Data Aggregation
-        # ********************************************************************************
-        """)
+    print("{:*<120}".format("*"))
+    print("{: ^120}".format("3. GOLD LAYER PROCESSING: Data Aggregation"))
+    print("{:*<120}".format("*"))
+
 
     if os.path.exists(constants.GOLD_INPUT_FILE_PATH):
         print("Gold layer: input file exists")
