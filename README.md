@@ -19,6 +19,7 @@ This project demonstrates a complete data engineering and analytics workflow usi
       * **Bronze Layer**: Ingests raw CSV data into Delta format, preserving the original data.
       * **Silver Layer**: Cleans, validates, and enriches the data (e.g., adding temporal features like month and year).
       * **Gold Layer**: Aggregates data to create business-level insights, ready for analytics and reporting.
+      * **Embedding Layer**: Converts gold layer insights into vector embeddings and ingests them into a ChromaDB vector store for semantic search.
 
 
 
@@ -27,12 +28,13 @@ This project demonstrates a complete data engineering and analytics workflow usi
 ```bash
 .
 ├── apps/
-│   ├── constant/constants.py          # Centralized configuration & file paths
-│   ├── process_all.py                # Orchestrates the entire ETL pipeline (Bronze -> Silver -> Gold)
-│   ├── process_bronze_layer.py      # Script for Bronze layer processing
-│   ├── process_silver_layer.py      # Script for Silver layer processing
-│   ├── process_gold_layer.py        # Script for Gold layer processing
-│   └── streamlit_app.py             # Streamlit dashboard application
+│   ├── constant/constants.py         # Centralized configuration & file paths
+│   ├── process_all.py                # Orchestrates the entire ETL pipeline
+│   ├── process_bronze_layer.py       # Script for Bronze layer processing
+│   ├── process_silver_layer.py       # Script for Silver layer processing
+│   ├── process_gold_layer.py         # Script for Gold layer processing
+│   ├── process_embedding.py          # Script for Embedding layer processing
+│   └── streamlit_app.py              # Streamlit dashboard application
 ├── data/                             # (Mounted) Directory for input (raw) and output (delta tables)
 ├── images/                           # Screenshots for README
 ├── Dockerfile                        # Defines the Spark environment
@@ -56,8 +58,10 @@ graph TD
     E --> F(Gold Layer);
     F -- Aggregation & Business Logic --> G{Delta Table: Aggregated Insights};
     G -- e.g., Top complaints, Borough-wise stats --> G;
-    G --> H(Streamlit Dashboard);
-    H -- Interactive Visualizations --> H;
+    G --> H(Embedding Layer);
+    H -- Vectorization --> I{ChromaDB Vector Store};
+    G --> J(Streamlit Dashboard);
+    J -- Interactive Visualizations --> J;
 ```
 
 **Why Delta Lake?**
@@ -103,13 +107,11 @@ pip install -r requirements.txt
 
 ### 5\. Build and Start the Spark Cluster 🐳
 
-You have two options to start the Spark cluster using Docker Compose:
+Run the following command to build your custom Spark image (which includes all Python dependencies) and start the Spark master and worker services.
 
-  * **Option A: Default (2 Master, 1 Worker)**
-
-    ```bash
-    docker-compose up --build -d
-    ```
+```bash
+docker-compose up --build -d
+```
 
   * **Option B: Scaled Workers (2 Master, 3 Workers)**
 

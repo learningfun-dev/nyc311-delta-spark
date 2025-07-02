@@ -4,9 +4,9 @@
 import os
 from pyspark.sql import SparkSession, functions as F
 from pyspark.sql.window import Window
-from delta.pip_utils import configure_spark_with_delta_pip
 import streamlit as st
 from constant import constants
+from utils.spark_utils import get_spark_session
 
 def main():
     '''
@@ -14,16 +14,7 @@ def main():
     '''
 
     # Initialize SparkSession
-    spark = (
-    SparkSession
-    .builder.master("spark://localhost:7077")
-    .appName(constants.STREAMLIT_APP_NAME)
-    .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
-    .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog")
-    )
-
-    spark = configure_spark_with_delta_pip(spark).getOrCreate()
-    spark.conf.set("spark.sql.debug.maxToStringFields", 1000)
+    spark = get_spark_session(constants.STREAMLIT_APP_NAME)
 
     log_step = """ ********************************************************************************
             4.Streamlit Dashboard

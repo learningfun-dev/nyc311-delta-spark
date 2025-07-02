@@ -5,3 +5,7 @@ pyspark==3.5.5
 delta-spark
 streamlit
 pystyle
+sentence_transformers
+tqdm
+chromadb
+pyarrow

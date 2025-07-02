@@ -10,6 +10,8 @@ services:
       - SPARK_USER=spark
       - SPARK_LOCAL_IP=spark
       - SPARK_EXECUTOR_MEMORY=2G
+      - SPARK_DRIVER_MEMORY=4g
+      - EMBEDDING_CHROMA_HOST=chromadb
     ports:
       - '8080:8080'
       - '7077:7077'
@@ -26,6 +28,7 @@ services:
       - SPARK_SSL_ENABLED=no
       - SPARK_USER=spark
       - SPARK_EXECUTOR_MEMORY=2G
+      - EMBEDDING_CHROMA_HOST=chromadb
     volumes:
       - ./data:/Users/manoj/projects/python/nyc311-delta-spark/data
 
@@ -42,5 +45,18 @@ services:
       - SPARK_SSL_ENABLED=no
       - SPARK_USER=spark
       - SPARK_EXECUTOR_MEMORY=2G
+      - EMBEDDING_CHROMA_HOST=chromadb
     volumes:
       - ./data:/Users/manoj/projects/python/nyc311-delta-spark/data
+
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: chromadb
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data/chroma:/chroma/chroma
+    environment:
+      - CHROMA_SERVER_NO_AUTH=true # Disable authentication for local development
+      - CHROMA_SERVER_HOST=0.0.0.0 # Allow connections from any IP
+      - CHROMA_SERVER_PORT=8000
