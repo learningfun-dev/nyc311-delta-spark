@@ -1,25 +1,13 @@
 services:
-  spark:
-    build: .
-    environment:
-      - SPARK_MODE=master
-      - SPARK_RPC_AUTHENTICATION_ENABLED=no
-      - SPARK_RPC_ENCRYPTION_ENABLED=no
-      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
-      - SPARK_SSL_ENABLED=no
-      - SPARK_USER=spark
-      - SPARK_LOCAL_IP=spark
-      - SPARK_EXECUTOR_MEMORY=2G
-      - SPARK_DRIVER_MEMORY=4g
-      - EMBEDDING_CHROMA_HOST=chromadb
+  zookeeper:
+    image: zookeeper:3.8
+    container_name: zookeeper
     ports:
-      - '8080:8080'
-      - '7077:7077'
-    volumes:
-      - ./data:/Users/manoj/projects/python/nyc311-delta-spark/data
+      - "2181:2181"
 
-  spark-master:
+  spark-master-1:
     build: .
+    container_name: spark-master-1
     environment:
       - SPARK_MODE=master
       - SPARK_RPC_AUTHENTICATION_ENABLED=no
@@ -29,16 +17,50 @@ services:
       - SPARK_USER=spark
       - SPARK_EXECUTOR_MEMORY=2G
       - EMBEDDING_CHROMA_HOST=chromadb
+      - SPARK_DAEMON_JAVA_OPTS=-Dspark.deploy.recoveryMode=ZOOKEEPER -Dspark.deploy.zookeeper.url=zookeeper:2181 -Dspark.deploy.zookeeper.dir=/spark
+      - SPARK_PUBLIC_DNS=localhost
+      - SPARK_MASTER_URL=spark://spark-master-1:7077,spark-master-2:7077
+      - SPARK_DRIVER_HOST=spark-master-1
+      - SPARK_DRIVER_PORT=25333
+    ports:
+      - "8080:8080"    # Expose only this master UI
+      - "7077:7077"    # Master RPC port
     volumes:
-      - ./data:/Users/manoj/projects/python/nyc311-delta-spark/data
+      - ./data:/opt/bitnami/spark/data
+    depends_on:
+      - zookeeper
 
-  spark-worker:
+  spark-master-2:
     build: .
+    container_name: spark-master-2
+    environment:
+      - SPARK_MODE=master
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+      - SPARK_USER=spark
+      - SPARK_EXECUTOR_MEMORY=2G
+      - EMBEDDING_CHROMA_HOST=chromadb
+      - SPARK_DAEMON_JAVA_OPTS=-Dspark.deploy.recoveryMode=ZOOKEEPER -Dspark.deploy.zookeeper.url=zookeeper:2181 -Dspark.deploy.zookeeper.dir=/spark
+      - SPARK_PUBLIC_DNS=spark-master-2
+      - SPARK_MASTER_URL=spark://spark-master-1:7077,spark-master-2:7077
+      - SPARK_DRIVER_HOST=spark-master-1
+      - SPARK_DRIVER_PORT=25333
+    volumes:
+      - ./data:/opt/bitnami/spark/data
+    depends_on:
+      - spark-master-1
+      - zookeeper
+
+  spark-worker-1:
+    build: .
+    container_name: spark-worker-1
     environment:
       - SPARK_MODE=worker
-      - SPARK_MASTER_URL=spark://spark:7077
-      - SPARK_WORKER_MEMORY=4G      #<--- adjust accordingly
-      - SPARK_WORKER_CORES=4        #<--- adjust accordingly
+      - SPARK_MASTER_URL=spark://spark-master-1:7077,spark-master-2:7077
+      - SPARK_WORKER_MEMORY=4G
+      - SPARK_WORKER_CORES=4
       - SPARK_RPC_AUTHENTICATION_ENABLED=no
       - SPARK_RPC_ENCRYPTION_ENABLED=no
       - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
@@ -46,8 +68,65 @@ services:
       - SPARK_USER=spark
       - SPARK_EXECUTOR_MEMORY=2G
       - EMBEDDING_CHROMA_HOST=chromadb
+      - SPARK_WORKER_WEBUI_PORT=4040
+      - SPARK_PUBLIC_DNS=localhost
+    ports:
+      - "4040:4040"
     volumes:
-      - ./data:/Users/manoj/projects/python/nyc311-delta-spark/data
+      - ./data:/opt/bitnami/spark/data
+    depends_on:
+      - spark-master-1
+      - spark-master-2
+
+  spark-worker-2:
+    build: .
+    container_name: spark-worker-2
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master-1:7077,spark-master-2:7077
+      - SPARK_WORKER_MEMORY=4G
+      - SPARK_WORKER_CORES=4
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+      - SPARK_USER=spark
+      - SPARK_EXECUTOR_MEMORY=2G
+      - EMBEDDING_CHROMA_HOST=chromadb
+      - SPARK_WORKER_WEBUI_PORT=4041
+      - SPARK_PUBLIC_DNS=localhost
+    ports:
+      - "4041:4041"
+    volumes:
+      - ./data:/opt/bitnami/spark/data
+    depends_on:
+      - spark-master-1
+      - spark-master-2
+
+  spark-worker-3:
+    build: .
+    container_name: spark-worker-3
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master-1:7077,spark-master-2:7077
+      - SPARK_WORKER_MEMORY=4G
+      - SPARK_WORKER_CORES=4
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+      - SPARK_USER=spark
+      - SPARK_EXECUTOR_MEMORY=2G
+      - EMBEDDING_CHROMA_HOST=chromadb
+      - SPARK_WORKER_WEBUI_PORT=4042
+      - SPARK_PUBLIC_DNS=localhost
+    ports:
+      - "4042:4042"
+    volumes:
+      - ./data:/opt/bitnami/spark/data
+    depends_on:
+      - spark-master-1
+      - spark-master-2
 
   chromadb:
     image: chromadb/chroma:latest
@@ -57,6 +136,6 @@ services:
     volumes:
       - ./data/chroma:/chroma/chroma
     environment:
-      - CHROMA_SERVER_NO_AUTH=true # Disable authentication for local development
-      - CHROMA_SERVER_HOST=0.0.0.0 # Allow connections from any IP
+      - CHROMA_SERVER_NO_AUTH=true
+      - CHROMA_SERVER_HOST=0.0.0.0
       - CHROMA_SERVER_PORT=8000

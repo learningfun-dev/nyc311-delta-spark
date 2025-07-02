@@ -1,8 +1,7 @@
 ipykernel
 jupyter
 pandas
-pyspark==3.5.5
-delta-spark
+pyspark==4.0.0
 streamlit
 pystyle
 sentence_transformers

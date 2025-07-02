@@ -139,7 +139,10 @@ def main() -> None:
             print("Verifying total document count in ChromaDB...")
             chroma_client = chromadb.HttpClient(host=constants.EMBEDDING_CHROMA_HOST, port=constants.EMBEDDING_CHROMA_PORT)
             collection = chroma_client.get_collection(name=constants.EMBEDDING_COLLECTION_NAME)
+            print("{:*<120}".format("*"))
+            print(f"Total documents in dataframes: {all_docs_df.count()}")
             print(f"Total documents in collection '{constants.EMBEDDING_COLLECTION_NAME}': {collection.count()}")
+            print("{:*<120}".format("*"))
 
     except Exception as e:
         print(f"An error occurred during the embedding process: {e}")

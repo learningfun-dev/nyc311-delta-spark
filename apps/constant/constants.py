@@ -9,8 +9,13 @@ PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..
 APP_NAME = "spark-sql"
 
 # Core Configuration - Override with environment variables
-SPARK_MASTER = os.getenv("SPARK_MASTER", "spark://localhost:7077")
+SPARK_MASTER = os.getenv("SPARK_MASTER_URL", "spark://localhost:7077")
+
+SPARK_DRIVER_HOST = os.getenv("SPARK_DRIVER_HOST", "localhost")
+SPARK_DRIVER_PORT = int(os.getenv("SPARK_DRIVER_PORT", "25333"))
+
 SPARK_DRIVER_MEMORY = os.getenv("SPARK_DRIVER_MEMORY", "2g")
+HOME = os.getenv("HOME", "/opt/bitnami/spark") # Home directory inside the container
 SHARED_DIRECTORY = os.getenv("SHARED_DIRECTORY", os.path.join(PROJECT_ROOT, "data"))
 OUTPUT_FILE_NAME = "311_service_requests/"
 
