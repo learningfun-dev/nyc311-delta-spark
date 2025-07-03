@@ -1,0 +1,22 @@
+# Use a slim Python base image for a smaller footprint
+FROM python:3.12-slim
+
+# Set the working directory inside the container
+WORKDIR /app
+
+# Copy the requirements file first to leverage Docker's layer caching.
+# You will need to create this file.
+COPY requirements_streamlit.txt .
+
+# Install all Python dependencies
+RUN pip install --no-cache-dir -r requirements_streamlit.txt
+
+# Copy the application code into the working directory
+COPY ./apps/streamlit_app.py ./apps/
+
+# Add the application's directory to PYTHONPATH
+ENV PYTHONPATH "${PYTHONPATH}:/app"
+
+# Expose the port the app runs on and define the command to run it
+EXPOSE 8501
+CMD ["streamlit", "run", "apps/streamlit_app.py", "--server.port=8501", "--server.address=0.0.0.0"]

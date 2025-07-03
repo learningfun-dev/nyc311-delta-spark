@@ -1,133 +1,65 @@
 '''
-    Streamlit Dashboard
+    Streamlit UI for the AI-Powered NYC 311 Analyst
 '''
 import os
-from pyspark.sql import SparkSession, functions as F
-from pyspark.sql.window import Window
 import streamlit as st
-from constant import constants
-from utils.spark_utils import get_spark_session
+import requests
 
 def main():
     '''
-        the main entry point for the application
+    The main entry point for the Streamlit application.
+    This app provides a chat interface to the RAG API.
     '''
+    st.set_page_config(page_title="NYC 311 Analyst", page_icon="🗽")
+    st.title("🗽 AI-Powered NYC 311 Analyst")
+    st.write(
+        "Ask a question about NYC 311 service requests. "
+        "The AI will analyze the data to find an answer using Retrieval-Augmented Generation."
+    )
 
-    # Initialize SparkSession
-    spark = get_spark_session(constants.STREAMLIT_APP_NAME)
+    # --- Configuration ---
+    # Get API connection details directly from environment variables for clarity
+    # and better container-based deployment.
+    api_host = os.getenv("API_HOST", "localhost")
+    api_port = int(os.getenv("API_PORT", 8001))
+    api_url = f"http://{api_host}:{api_port}/stream_chat"
 
-    log_step = """ ********************************************************************************
-            4.Streamlit Dashboard
-            ********************************************************************************
-        """
-    print(log_step)
+    # --- Chat History ---
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
 
-    st.title("NYC 311 Complaints Dashboard")
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
 
-    # Top complaint bar chart
-    st.subheader("Top 3 Complaint Types per Month")
-    if not os.path.exists(constants.GOLD_OUTPUT_FILE_PATH_BY_BOROUGH):
-        st.write("Gold Delta lake for Top Complaint Types doesn't exists.")
-    else:
-        top_complaints_df = ( spark.read
-            .format("delta")
-            .load(constants.GOLD_OUTPUT_FILE_PATH_TOP_COMPLAINTS)
-        )
+    # --- User Input ---
+    if prompt := st.chat_input("e.g., How many noise complaints were there in Brooklyn last year?"):
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
 
-        if top_complaints_df.rdd.isEmpty():
-            st.write("No data available for Top Complaint Types.")
-        else:
-            # Add year_month column
-            top_complaints_df = top_complaints_df.withColumn(
-                "year_month",
-                F.concat_ws("-", top_complaints_df["year"].cast("string"), F.lpad(top_complaints_df["month"].cast("string"), 2, "0"))
-            )
+        # --- Call API and Stream Response ---
+        with st.chat_message("assistant"):
+            message_placeholder = st.empty()
+            full_response = ""
+            try:
+                # Send the history, but exclude the latest user prompt which is passed separately
+                history_to_send = st.session_state.messages[:-1]
 
-            # Step 1: Aggregate total counts per complaint_type per year
-            yearly_totals_df = (
-                                top_complaints_df.groupBy("year", "complaint_type")
-                                    .agg(F.sum("count").alias("total_count"))
-                                )
-
-            # Step 2: Window function to get top 3 complaint types per year
-            window_spec = Window.partitionBy("year").orderBy(F.desc("total_count"))
-            top_complaints_df_ranked = (yearly_totals_df.withColumn("rank"
-                                                        ,F.row_number().over(window_spec))
-                                                        .filter(F.col("rank") <= 3)
-                                                        .select("year", "complaint_type"))
-
-            # Step 3: Join to filter original monthly data
-            filtered_df = top_complaints_df.join(top_complaints_df_ranked, on=["year", "complaint_type"])
-
-            # Step 4: Convert to Pandas for Streamlit plotting
-            filtered_pd = filtered_df.groupBy("year_month", "complaint_type") \
-                .agg(F.sum("count").alias("count")) \
-                .orderBy("year_month") \
-                .toPandas()
-
-            # Step 5: Pivot for bar chart
-            pivot_df = filtered_pd.pivot_table(
-                index="year_month",
-                columns="complaint_type",
-                values="count",
-                fill_value=0
-            )
-
-            # Step 6: Plot
-            st.bar_chart(pivot_df)
-
-    st.subheader("Top 3 Borough Complaints by Month")
-    if not os.path.exists(constants.GOLD_OUTPUT_FILE_PATH_BY_BOROUGH):
-        st.write("Gold Delta lake for Complaints by Borough doesn't exists.")
-    else:
-        # Visualize Complaints by Borough
-        by_borough_df = ( spark.read
-            .format("delta")
-            .load(constants.GOLD_OUTPUT_FILE_PATH_BY_BOROUGH)
-        )
-       # Add year_month column
-        by_borough_df = by_borough_df.withColumn(
-                "year_month",
-                F.concat_ws("-", by_borough_df["year"].cast("string"), F.lpad(by_borough_df["month"].cast("string"), 2, "0"))
-            )
-
-        # Step 1: Aggregate total counts per borough per year
-        yearly_totals_df = by_borough_df.groupBy("year", "borough") \
-            .agg(F.sum("count").alias("total_count"))
-
-        # Step 2: Window function to get top 3 complaint types per year
-        window_spec = Window.partitionBy("year").orderBy(F.desc("total_count"))
-        top_borough_df_ranked = (yearly_totals_df.withColumn("rank"
-                                                        , F.row_number().over(window_spec))
-                                                        .filter(F.col("rank") <= 3)
-                                                        .select("year", "borough"))
-
-        # Step 3: Join to filter original monthly data
-        filtered_df = by_borough_df.join(top_borough_df_ranked
-                                                 , on=["year", "borough"])
-
-        # Step 4: Convert to Pandas for Streamlit plotting
-        filtered_pd = ( 
-                filtered_df.groupBy("year_month", "borough")
-                .agg(F.sum("count").alias("count"))
-                .orderBy("year_month")
-                .toPandas()
-        )
-
-        # Step 5: Pivot for bar chart
-        pivot_df = filtered_pd.pivot_table(
-            index="year_month",
-            columns="borough",
-            values="count",
-            fill_value=0
-        )
-
-        # Step 6: Plot
-        st.bar_chart(pivot_df)
-        # Stop the SparkSession
-
-    spark.stop()
-
+                with requests.post(
+                    api_url, json={"question": prompt, "chat_history": history_to_send}, stream=True, timeout=120
+                ) as r:
+                    r.raise_for_status()  # Raise an exception for bad status codes (4xx or 5xx)
+                    for chunk in r.iter_content(chunk_size=None, decode_unicode=True):
+                        full_response += chunk
+                        message_placeholder.markdown(full_response + "▌")
+                message_placeholder.markdown(full_response)
+            except requests.exceptions.RequestException as e:
+                error_message = f"Failed to connect to the API at `{api_url}`. Please ensure the API service is running. Error: {e}"
+                st.error(error_message)
+                full_response = "Sorry, I couldn't connect to the analysis service. Please try again later."
+        
+        st.session_state.messages.append({"role": "assistant", "content": full_response})
 
 if __name__ == "__main__":
     main()

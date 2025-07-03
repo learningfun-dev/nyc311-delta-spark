@@ -177,3 +177,18 @@ services:
     depends_on:
       chromadb:
         condition: service_healthy
+
+  streamlit-app:
+    build:
+      context: .
+      dockerfile: dockerfile_streamlit
+    container_name: streamlit-app
+    ports:
+      - "8501:8501"
+    environment:
+      # Point to the containerized RAG API service
+      - API_HOST=rag-api
+      - API_PORT=8001
+    depends_on:
+      rag-api:
+        condition: service_started

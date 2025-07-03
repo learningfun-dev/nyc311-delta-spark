@@ -6,7 +6,7 @@ import os
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 
-APP_NAME = "spark-sql"
+APP_NAME = "NYC-311"
 
 # Core Configuration - Override with environment variables
 SPARK_MASTER = os.getenv("SPARK_MASTER_URL", "spark://localhost:7077")

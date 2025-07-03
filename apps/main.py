@@ -209,7 +209,7 @@ async def stream_chat(request: QueryRequest):
 
         async def wrapped_generator():
             async for chunk in rag_chain.astream(chain_input):
-                yield chunk + "\n"
+                yield chunk
         
         return StreamingResponse(wrapped_generator(), media_type="text/plain")
 
