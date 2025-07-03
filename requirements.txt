@@ -7,7 +7,6 @@ pystyle
 tqdm
 chromadb
 pyarrow
-fastapi
 langchain-core
 langchain-community
 ollama # This is the ollama client, which can be kept.

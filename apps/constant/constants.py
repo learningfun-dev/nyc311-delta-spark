@@ -58,7 +58,7 @@ API_DESCRIPTION = os.getenv("API_DESCRIPTION", "API for querying NYC 311 data wi
 API_VERSION = os.getenv("API_VERSION", "2.0.0")
 LOCAL_LLM_MODEL = os.getenv("LOCAL_LLM_MODEL", "llama3:instruct")
 # Use host.docker.internal to allow the container to connect to the Ollama server running on the host machine.
-OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://host.docker.internal:11434")
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 
 # streamlit_app constants
 STREAMLIT_APP_NAME = APP_NAME + ":Streamlit"

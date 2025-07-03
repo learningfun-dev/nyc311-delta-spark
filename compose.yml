@@ -22,6 +22,7 @@ services:
       - SPARK_MASTER_URL=spark://spark-master-1:7077,spark-master-2:7077
       - SPARK_DRIVER_HOST=spark-master-1
       - SPARK_DRIVER_PORT=25333
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434      
     ports:
       - "8080:8080"    # Expose only this master UI
       - "7077:7077"    # Master RPC port
@@ -50,6 +51,7 @@ services:
       - SPARK_MASTER_URL=spark://spark-master-1:7077,spark-master-2:7077
       - SPARK_DRIVER_HOST=spark-master-1
       - SPARK_DRIVER_PORT=25333
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
     volumes:
       - ./data:/opt/bitnami/spark/data
     depends_on:
@@ -77,13 +79,16 @@ services:
       - EMBEDDING_CHROMA_HOST=chromadb
       - SPARK_WORKER_WEBUI_PORT=4040
       - SPARK_PUBLIC_DNS=localhost
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
     ports:
       - "4040:4040"
     volumes:
       - ./data:/opt/bitnami/spark/data
     depends_on:
-      - spark-master-1
-      - spark-master-2
+      spark-master-1:
+        condition: service_started
+      spark-master-2:
+        condition: service_started
 
   spark-worker-2:
     build: .
@@ -102,13 +107,16 @@ services:
       - EMBEDDING_CHROMA_HOST=chromadb
       - SPARK_WORKER_WEBUI_PORT=4041
       - SPARK_PUBLIC_DNS=localhost
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
     ports:
       - "4041:4041"
     volumes:
       - ./data:/opt/bitnami/spark/data
     depends_on:
-      - spark-master-1
-      - spark-master-2
+      spark-master-1:
+        condition: service_started
+      spark-master-2:
+        condition: service_started
 
   spark-worker-3:
     build: .
@@ -127,13 +135,16 @@ services:
       - EMBEDDING_CHROMA_HOST=chromadb
       - SPARK_WORKER_WEBUI_PORT=4042
       - SPARK_PUBLIC_DNS=localhost
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
     ports:
       - "4042:4042"
     volumes:
       - ./data:/opt/bitnami/spark/data
     depends_on:
-      - spark-master-1
-      - spark-master-2
+      spark-master-1:
+        condition: service_started
+      spark-master-2:
+        condition: service_started
 
   chromadb:
     build: ./dockerfile_chromadb
@@ -148,6 +159,21 @@ services:
       - CHROMA_SERVER_PORT=8000
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/v2/heartbeat"]
-      interval: 30s
+      interval: 15s
       timeout: 10s
-      retries: 3
+      retries: 5
+
+  rag-api:
+    build:
+      context: .
+      dockerfile: dockerfile_api
+    container_name: rag-api
+    ports:
+      - "8001:8001"
+    environment:
+      - EMBEDDING_CHROMA_HOST=chromadb
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434      
+    command: ["uvicorn", "apps.main:app", "--host", "0.0.0.0", "--port", "8001"]
+    depends_on:
+      chromadb:
+        condition: service_healthy
