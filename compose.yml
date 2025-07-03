@@ -28,7 +28,10 @@ services:
     volumes:
       - ./data:/opt/bitnami/spark/data
     depends_on:
-      - zookeeper
+      zookeeper:
+        condition: service_started
+      chromadb:
+        condition: service_healthy
 
   spark-master-2:
     build: .
@@ -50,8 +53,12 @@ services:
     volumes:
       - ./data:/opt/bitnami/spark/data
     depends_on:
-      - spark-master-1
-      - zookeeper
+      spark-master-1:
+        condition: service_started
+      zookeeper:
+        condition: service_started
+      chromadb:
+        condition: service_healthy
 
   spark-worker-1:
     build: .
@@ -129,13 +136,18 @@ services:
       - spark-master-2
 
   chromadb:
-    image: chromadb/chroma:latest
+    build: ./dockerfile_chromadb
     container_name: chromadb
     ports:
       - "8000:8000"
     volumes:
-      - ./data/chroma:/chroma/chroma
+      - ./data/chroma:/data
     environment:
       - CHROMA_SERVER_NO_AUTH=true
       - CHROMA_SERVER_HOST=0.0.0.0
       - CHROMA_SERVER_PORT=8000
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v2/heartbeat"]
+      interval: 30s
+      timeout: 10s
+      retries: 3

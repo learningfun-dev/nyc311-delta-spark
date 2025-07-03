@@ -73,11 +73,17 @@ def _ingest_partition_to_chromadb(iterator: iter) -> None:
     
     # Initialize client and embedding function on the executor
     chroma_client = chromadb.HttpClient(host=constants.EMBEDDING_CHROMA_HOST, port=constants.EMBEDDING_CHROMA_PORT)
-    sentence_transformer_ef = embedding_functions.SentenceTransformerEmbeddingFunction(
-        model_name=constants.EMBEDDING_MODEL)
+
+    # Use ChromaDB's native Ollama embedding function, which is compatible with the raw client.
+    # The LangChain OllamaEmbeddings object is not directly compatible with the raw chromadb client.
+    embedding_function = embedding_functions.OllamaEmbeddingFunction(
+        url=f"{constants.OLLAMA_BASE_URL}/api/embeddings",
+        model_name=constants.EMBEDDING_MODEL,
+    )
+
     collection = chroma_client.get_or_create_collection(
         name=constants.EMBEDDING_COLLECTION_NAME,
-        embedding_function=sentence_transformer_ef,
+        embedding_function=embedding_function, # Use the new Ollama embedding function
         metadata={"hnsw:space": "cosine"}
     )
 
@@ -100,6 +106,8 @@ def _ingest_partition_to_chromadb(iterator: iter) -> None:
             metadatas_to_ingest.append(filtered_metadata)
 
         print(f"Ingesting batch of {len(ids_to_ingest)} documents from a partition.")
+        # When collection.add is called, ChromaDB will use the embedding_function 
+        # we provided to automatically generate the embeddings.
         collection.add(documents=documents_to_ingest, metadatas=metadatas_to_ingest, ids=ids_to_ingest)
 
 
@@ -130,6 +138,19 @@ def main() -> None:
     try:
         all_docs_df = _load_and_transform_data(spark)
         if all_docs_df is not None:
+            # Ensure the collection is in a clean state before ingesting new data.
+            print(f"Preparing collection: '{constants.EMBEDDING_COLLECTION_NAME}'")
+            chroma_client = chromadb.HttpClient(host=constants.EMBEDDING_CHROMA_HOST, port=constants.EMBEDDING_CHROMA_PORT)
+
+            # Check if the collection exists before trying to delete it.
+            existing_collections = [c.name for c in chroma_client.list_collections()]
+            if constants.EMBEDDING_COLLECTION_NAME in existing_collections:
+                print(f"Collection '{constants.EMBEDDING_COLLECTION_NAME}' found. Deleting it to ensure a fresh start.")
+                chroma_client.delete_collection(name=constants.EMBEDDING_COLLECTION_NAME)
+                print("Successfully deleted existing collection.")
+            else:
+                print("Collection does not exist. Proceeding with creation during ingestion.")
+
             # Use foreachPartition to process data on each worker node
             print("Starting distributed ingestion into ChromaDB...")
             all_docs_df.foreachPartition(_ingest_partition_to_chromadb)
@@ -137,7 +158,6 @@ def main() -> None:
 
             # Verify final count by querying ChromaDB directly from the driver
             print("Verifying total document count in ChromaDB...")
-            chroma_client = chromadb.HttpClient(host=constants.EMBEDDING_CHROMA_HOST, port=constants.EMBEDDING_CHROMA_PORT)
             collection = chroma_client.get_collection(name=constants.EMBEDDING_COLLECTION_NAME)
             print("{:*<120}".format("*"))
             print(f"Total documents in dataframes: {all_docs_df.count()}")

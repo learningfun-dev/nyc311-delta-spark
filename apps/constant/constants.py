@@ -22,9 +22,6 @@ OUTPUT_FILE_NAME = "311_service_requests/"
 # input file
 INPUT_FILE_NAME = os.getenv("INPUT_FILE_NAME", "erm2-nwe9_version_176301.csv") # use for end to end final output
 
-# INPUT_FILE_NAME = "small_erm2-nwe9_version_176301.csv" # dev file path
-
-
 # Bronze  constants
 BRONZE_APP_NAME = APP_NAME + ":Bronze"
 BRONZE_INPUT_FILE_PATH = os.path.join(SHARED_DIRECTORY, "raw", INPUT_FILE_NAME)
@@ -51,9 +48,20 @@ EMBEDDING_PATH_BY_BOROUGH = GOLD_OUTPUT_FILE_PATH_BY_BOROUGH
 EMBEDDING_COLLECTION_NAME = "nyc_311_gold"
 EMBEDDING_CHROMA_HOST = os.getenv("EMBEDDING_CHROMA_HOST", "localhost")
 EMBEDDING_CHROMA_PORT = int(os.getenv("EMBEDDING_CHROMA_PORT", "8000"))
-EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "nomic-embed-text")
 EMBEDDING_BATCH_SIZE = int(os.getenv("EMBEDDING_BATCH_SIZE", "5000"))
 
 
+# RAG API constants
+API_TITLE = os.getenv("API_TITLE", "AI-Powered NYC 311 Analyst API (RAG 2.0)")
+API_DESCRIPTION = os.getenv("API_DESCRIPTION", "API for querying NYC 311 data with query rephrasing and a local LLM.")
+API_VERSION = os.getenv("API_VERSION", "2.0.0")
+LOCAL_LLM_MODEL = os.getenv("LOCAL_LLM_MODEL", "llama3:instruct")
+# Use host.docker.internal to allow the container to connect to the Ollama server running on the host machine.
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://host.docker.internal:11434")
+
 # streamlit_app constants
 STREAMLIT_APP_NAME = APP_NAME + ":Streamlit"
+API_HOST = os.getenv("API_HOST", "localhost")
+API_PORT = int(os.getenv("API_PORT", 8001))
+API_URL = f"http://{API_HOST}:{API_PORT}/stream_chat"

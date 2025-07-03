@@ -4,7 +4,13 @@ pandas
 pyspark==4.0.0
 streamlit
 pystyle
-sentence_transformers
 tqdm
 chromadb
 pyarrow
+fastapi
+langchain-core
+langchain-community
+ollama # This is the ollama client, which can be kept.
+langchain-chroma
+langchain-ollama
+requests

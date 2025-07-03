@@ -23,16 +23,6 @@ RUN mkdir -p /opt/bitnami/spark/delta_jars && \
     curl -L -o delta-storage-4.0.0.jar https://repo1.maven.org/maven2/io/delta/delta-storage/4.0.0/delta-storage-4.0.0.jar && \
     curl -L -o antlr4-runtime-4.13.1.jar https://repo1.maven.org/maven2/org/antlr/antlr4-runtime/4.13.1/antlr4-runtime-4.13.1.jar
 
-# --- Pre-download ML Model ---
-# Create a directory for the model cache that is writable by the spark user (UID 1001).
-RUN mkdir -p /opt/bitnami/spark/models && \
-    chown -R 1001:0 /opt/bitnami/spark/models && \
-    chmod -R g+w /opt/bitnami/spark/models
-
-# Set the cache directory for Hugging Face transformers.
-# The sentence-transformers library will use this path.
-ENV HF_HOME=/opt/bitnami/spark/models
-
 # Set the HOME directory for the spark user to ensure processes like Ivy can resolve paths.
 ENV HOME=/opt/bitnami/spark
 
@@ -41,9 +31,6 @@ COPY ./apps ./apps
 
 # Add the application's directory to PYTHONPATH so that its modules can be found by workers.
 ENV PYTHONPATH "${PYTHONPATH}:/opt/bitnami/spark/apps"
-
-# Run the download script as root to populate the cache.
-RUN python /opt/bitnami/spark/apps/utils/download_model.py
 
 # Add spark user entry for UID 1001
 RUN echo "spark:x:1001:0::/home/spark:/bin/bash" >> /etc/passwd && \
