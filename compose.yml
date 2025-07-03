@@ -2,11 +2,14 @@ services:
   zookeeper:
     image: zookeeper:3.8
     container_name: zookeeper
+    profiles: [spark, all]
     ports:
       - "2181:2181"
 
   spark-master-1:
-    build: .
+    build: 
+      context: .
+      dockerfile: docker/dockerfile_spark
     container_name: spark-master-1
     environment:
       - SPARK_MODE=master
@@ -17,12 +20,13 @@ services:
       - SPARK_USER=spark
       - SPARK_EXECUTOR_MEMORY=2G
       - EMBEDDING_CHROMA_HOST=chromadb
-      - SPARK_DAEMON_JAVA_OPTS=-Dspark.deploy.recoveryMode=ZOOKEEPER -Dspark.deploy.zookeeper.url=zookeeper:2181 -Dspark.deploy.zookeeper.dir=/spark
+      - SPARK_DAEMON_JAVA_OPTS=-Dspark.deploy.recoveryMode=ZOOKEEPER -Dspark.deploy.zookeeper.url=zookeeper:2181 -Dspark.deploy.zookeeper.dir=/spark -Dspark.ui.enabledModules=all
       - SPARK_PUBLIC_DNS=localhost
       - SPARK_MASTER_URL=spark://spark-master-1:7077,spark-master-2:7077
       - SPARK_DRIVER_HOST=spark-master-1
       - SPARK_DRIVER_PORT=25333
       - OLLAMA_BASE_URL=http://host.docker.internal:11434      
+    profiles: [spark, all]
     ports:
       - "8080:8080"    # Expose only this master UI
       - "7077:7077"    # Master RPC port
@@ -35,7 +39,9 @@ services:
         condition: service_healthy
 
   spark-master-2:
-    build: .
+    build: 
+      context: .
+      dockerfile: docker/dockerfile_spark
     container_name: spark-master-2
     environment:
       - SPARK_MODE=master
@@ -46,12 +52,13 @@ services:
       - SPARK_USER=spark
       - SPARK_EXECUTOR_MEMORY=2G
       - EMBEDDING_CHROMA_HOST=chromadb
-      - SPARK_DAEMON_JAVA_OPTS=-Dspark.deploy.recoveryMode=ZOOKEEPER -Dspark.deploy.zookeeper.url=zookeeper:2181 -Dspark.deploy.zookeeper.dir=/spark
+      - SPARK_DAEMON_JAVA_OPTS=-Dspark.deploy.recoveryMode=ZOOKEEPER -Dspark.deploy.zookeeper.url=zookeeper:2181 -Dspark.deploy.zookeeper.dir=/spark -Dspark.ui.enabledModules=all
       - SPARK_PUBLIC_DNS=spark-master-2
       - SPARK_MASTER_URL=spark://spark-master-1:7077,spark-master-2:7077
       - SPARK_DRIVER_HOST=spark-master-1
       - SPARK_DRIVER_PORT=25333
       - OLLAMA_BASE_URL=http://host.docker.internal:11434
+    profiles: [spark, all]
     volumes:
       - ./data:/opt/bitnami/spark/data
     depends_on:
@@ -63,7 +70,9 @@ services:
         condition: service_healthy
 
   spark-worker-1:
-    build: .
+    build: 
+      context: .
+      dockerfile: docker/dockerfile_spark
     container_name: spark-worker-1
     environment:
       - SPARK_MODE=worker
@@ -80,6 +89,8 @@ services:
       - SPARK_WORKER_WEBUI_PORT=4040
       - SPARK_PUBLIC_DNS=localhost
       - OLLAMA_BASE_URL=http://host.docker.internal:11434
+      - SPARK_DAEMON_JAVA_OPTS=-Dspark.deploy.recoveryMode=ZOOKEEPER -Dspark.deploy.zookeeper.url=zookeeper:2181 -Dspark.deploy.zookeeper.dir=/spark -Dspark.ui.enabledModules=all
+    profiles: [spark, all]
     ports:
       - "4040:4040"
     volumes:
@@ -91,7 +102,9 @@ services:
         condition: service_started
 
   spark-worker-2:
-    build: .
+    build: 
+      context: .
+      dockerfile: docker/dockerfile_spark
     container_name: spark-worker-2
     environment:
       - SPARK_MODE=worker
@@ -108,6 +121,8 @@ services:
       - SPARK_WORKER_WEBUI_PORT=4041
       - SPARK_PUBLIC_DNS=localhost
       - OLLAMA_BASE_URL=http://host.docker.internal:11434
+      - SPARK_DAEMON_JAVA_OPTS=-Dspark.deploy.recoveryMode=ZOOKEEPER -Dspark.deploy.zookeeper.url=zookeeper:2181 -Dspark.deploy.zookeeper.dir=/spark -Dspark.ui.enabledModules=all
+    profiles: [spark, all]
     ports:
       - "4041:4041"
     volumes:
@@ -119,7 +134,9 @@ services:
         condition: service_started
 
   spark-worker-3:
-    build: .
+    build: 
+      context: .
+      dockerfile: docker/dockerfile_spark
     container_name: spark-worker-3
     environment:
       - SPARK_MODE=worker
@@ -136,6 +153,8 @@ services:
       - SPARK_WORKER_WEBUI_PORT=4042
       - SPARK_PUBLIC_DNS=localhost
       - OLLAMA_BASE_URL=http://host.docker.internal:11434
+      - SPARK_DAEMON_JAVA_OPTS=-Dspark.deploy.recoveryMode=ZOOKEEPER -Dspark.deploy.zookeeper.url=zookeeper:2181 -Dspark.deploy.zookeeper.dir=/spark -Dspark.ui.enabledModules=all
+    profiles: [spark, all]
     ports:
       - "4042:4042"
     volumes:
@@ -147,8 +166,11 @@ services:
         condition: service_started
 
   chromadb:
-    build: ./dockerfile_chromadb
+    build: 
+      context: .
+      dockerfile: docker/dockerfile_chromadb
     container_name: chromadb
+    profiles: [spark, rag, all]
     ports:
       - "8000:8000"
     volumes:
@@ -166,8 +188,9 @@ services:
   rag-api:
     build:
       context: .
-      dockerfile: dockerfile_api
+      dockerfile: docker/dockerfile_api
     container_name: rag-api
+    profiles: [rag, all]
     ports:
       - "8001:8001"
     environment:
@@ -181,8 +204,9 @@ services:
   streamlit-app:
     build:
       context: .
-      dockerfile: dockerfile_streamlit
+      dockerfile: docker/dockerfile_streamlit
     container_name: streamlit-app
+    profiles: [rag, all]
     ports:
       - "8501:8501"
     environment:

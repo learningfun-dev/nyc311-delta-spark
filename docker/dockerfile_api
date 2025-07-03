@@ -9,10 +9,10 @@ RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 
 # Copy the requirements file first to leverage Docker's layer caching
-COPY requirements_api.txt .
+COPY requirements/api.txt ./requirements.txt
 
 # Install all Python dependencies
-RUN pip install --no-cache-dir -r requirements_api.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the application code into the working directory
 COPY ./apps/main.py ./apps/
