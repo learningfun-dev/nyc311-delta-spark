@@ -13,3 +13,4 @@ ollama # This is the ollama client, which can be kept.
 langchain-chroma
 langchain-ollama
 requests
+delta-spark

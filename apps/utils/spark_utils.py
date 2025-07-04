@@ -18,6 +18,7 @@ def get_spark_session(app_name: str) -> SparkSession:
         "/opt/bitnami/spark/delta_jars/delta-spark_2.13-4.0.0.jar",
         "/opt/bitnami/spark/delta_jars/delta-storage-4.0.0.jar",
         "/opt/bitnami/spark/delta_jars/antlr4-runtime-4.13.1.jar",
+        "/opt/bitnami/spark/jars/spark-ui_2.13-4.0.0.jar"
     ]
 
     spark_builder = SparkSession.builder.appName(app_name)

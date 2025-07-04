@@ -7,29 +7,19 @@ services:
       - "2181:2181"
 
   spark-master-1:
-    build: 
+    build:
       context: .
       dockerfile: docker/dockerfile_spark
     container_name: spark-master-1
+    env_file:
+      - compose.env
     environment:
       - SPARK_MODE=master
-      - SPARK_RPC_AUTHENTICATION_ENABLED=no
-      - SPARK_RPC_ENCRYPTION_ENABLED=no
-      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
-      - SPARK_SSL_ENABLED=no
-      - SPARK_USER=spark
-      - SPARK_EXECUTOR_MEMORY=2G
-      - EMBEDDING_CHROMA_HOST=chromadb
-      - SPARK_DAEMON_JAVA_OPTS=-Dspark.deploy.recoveryMode=ZOOKEEPER -Dspark.deploy.zookeeper.url=zookeeper:2181 -Dspark.deploy.zookeeper.dir=/spark -Dspark.ui.enabledModules=all
-      - SPARK_PUBLIC_DNS=localhost
-      - SPARK_MASTER_URL=spark://spark-master-1:7077,spark-master-2:7077
-      - SPARK_DRIVER_HOST=spark-master-1
-      - SPARK_DRIVER_PORT=25333
-      - OLLAMA_BASE_URL=http://host.docker.internal:11434      
     profiles: [spark, all]
     ports:
-      - "8080:8080"    # Expose only this master UI
-      - "7077:7077"    # Master RPC port
+      - "8080:8080"
+      - "7077:7077"
+      - "4040:4040"
     volumes:
       - ./data:/opt/bitnami/spark/data
     depends_on:
@@ -39,26 +29,17 @@ services:
         condition: service_healthy
 
   spark-master-2:
-    build: 
+    build:
       context: .
       dockerfile: docker/dockerfile_spark
     container_name: spark-master-2
+    env_file:
+      - compose.env
     environment:
       - SPARK_MODE=master
-      - SPARK_RPC_AUTHENTICATION_ENABLED=no
-      - SPARK_RPC_ENCRYPTION_ENABLED=no
-      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
-      - SPARK_SSL_ENABLED=no
-      - SPARK_USER=spark
-      - SPARK_EXECUTOR_MEMORY=2G
-      - EMBEDDING_CHROMA_HOST=chromadb
-      - SPARK_DAEMON_JAVA_OPTS=-Dspark.deploy.recoveryMode=ZOOKEEPER -Dspark.deploy.zookeeper.url=zookeeper:2181 -Dspark.deploy.zookeeper.dir=/spark -Dspark.ui.enabledModules=all
-      - SPARK_PUBLIC_DNS=spark-master-2
-      - SPARK_MASTER_URL=spark://spark-master-1:7077,spark-master-2:7077
-      - SPARK_DRIVER_HOST=spark-master-1
-      - SPARK_DRIVER_PORT=25333
-      - OLLAMA_BASE_URL=http://host.docker.internal:11434
     profiles: [spark, all]
+    ports:
+      - "5055:4040"
     volumes:
       - ./data:/opt/bitnami/spark/data
     depends_on:
@@ -70,29 +51,18 @@ services:
         condition: service_healthy
 
   spark-worker-1:
-    build: 
+    build:
       context: .
       dockerfile: docker/dockerfile_spark
     container_name: spark-worker-1
+    env_file:
+      - compose.env
     environment:
       - SPARK_MODE=worker
-      - SPARK_MASTER_URL=spark://spark-master-1:7077,spark-master-2:7077
-      - SPARK_WORKER_MEMORY=4G
-      - SPARK_WORKER_CORES=4
-      - SPARK_RPC_AUTHENTICATION_ENABLED=no
-      - SPARK_RPC_ENCRYPTION_ENABLED=no
-      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
-      - SPARK_SSL_ENABLED=no
-      - SPARK_USER=spark
-      - SPARK_EXECUTOR_MEMORY=2G
-      - EMBEDDING_CHROMA_HOST=chromadb
-      - SPARK_WORKER_WEBUI_PORT=4040
-      - SPARK_PUBLIC_DNS=localhost
-      - OLLAMA_BASE_URL=http://host.docker.internal:11434
-      - SPARK_DAEMON_JAVA_OPTS=-Dspark.deploy.recoveryMode=ZOOKEEPER -Dspark.deploy.zookeeper.url=zookeeper:2181 -Dspark.deploy.zookeeper.dir=/spark -Dspark.ui.enabledModules=all
+      - SPARK_WORKER_WEBUI_PORT=4046
     profiles: [spark, all]
     ports:
-      - "4040:4040"
+      - "4046:4046"
     volumes:
       - ./data:/opt/bitnami/spark/data
     depends_on:
@@ -102,29 +72,18 @@ services:
         condition: service_started
 
   spark-worker-2:
-    build: 
+    build:
       context: .
       dockerfile: docker/dockerfile_spark
     container_name: spark-worker-2
+    env_file:
+      - compose.env
     environment:
       - SPARK_MODE=worker
-      - SPARK_MASTER_URL=spark://spark-master-1:7077,spark-master-2:7077
-      - SPARK_WORKER_MEMORY=4G
-      - SPARK_WORKER_CORES=4
-      - SPARK_RPC_AUTHENTICATION_ENABLED=no
-      - SPARK_RPC_ENCRYPTION_ENABLED=no
-      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
-      - SPARK_SSL_ENABLED=no
-      - SPARK_USER=spark
-      - SPARK_EXECUTOR_MEMORY=2G
-      - EMBEDDING_CHROMA_HOST=chromadb
-      - SPARK_WORKER_WEBUI_PORT=4041
-      - SPARK_PUBLIC_DNS=localhost
-      - OLLAMA_BASE_URL=http://host.docker.internal:11434
-      - SPARK_DAEMON_JAVA_OPTS=-Dspark.deploy.recoveryMode=ZOOKEEPER -Dspark.deploy.zookeeper.url=zookeeper:2181 -Dspark.deploy.zookeeper.dir=/spark -Dspark.ui.enabledModules=all
+      - SPARK_WORKER_WEBUI_PORT=4047
     profiles: [spark, all]
     ports:
-      - "4041:4041"
+      - "4047:4047"
     volumes:
       - ./data:/opt/bitnami/spark/data
     depends_on:
@@ -134,29 +93,18 @@ services:
         condition: service_started
 
   spark-worker-3:
-    build: 
+    build:
       context: .
       dockerfile: docker/dockerfile_spark
     container_name: spark-worker-3
+    env_file:
+      - compose.env
     environment:
       - SPARK_MODE=worker
-      - SPARK_MASTER_URL=spark://spark-master-1:7077,spark-master-2:7077
-      - SPARK_WORKER_MEMORY=4G
-      - SPARK_WORKER_CORES=4
-      - SPARK_RPC_AUTHENTICATION_ENABLED=no
-      - SPARK_RPC_ENCRYPTION_ENABLED=no
-      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
-      - SPARK_SSL_ENABLED=no
-      - SPARK_USER=spark
-      - SPARK_EXECUTOR_MEMORY=2G
-      - EMBEDDING_CHROMA_HOST=chromadb
-      - SPARK_WORKER_WEBUI_PORT=4042
-      - SPARK_PUBLIC_DNS=localhost
-      - OLLAMA_BASE_URL=http://host.docker.internal:11434
-      - SPARK_DAEMON_JAVA_OPTS=-Dspark.deploy.recoveryMode=ZOOKEEPER -Dspark.deploy.zookeeper.url=zookeeper:2181 -Dspark.deploy.zookeeper.dir=/spark -Dspark.ui.enabledModules=all
+      - SPARK_WORKER_WEBUI_PORT=4048
     profiles: [spark, all]
     ports:
-      - "4042:4042"
+      - "4048:4048"
     volumes:
       - ./data:/opt/bitnami/spark/data
     depends_on:
@@ -166,7 +114,7 @@ services:
         condition: service_started
 
   chromadb:
-    build: 
+    build:
       context: .
       dockerfile: docker/dockerfile_chromadb
     container_name: chromadb
@@ -195,7 +143,7 @@ services:
       - "8001:8001"
     environment:
       - EMBEDDING_CHROMA_HOST=chromadb
-      - OLLAMA_BASE_URL=http://host.docker.internal:11434      
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
     command: ["uvicorn", "apps.main:app", "--host", "0.0.0.0", "--port", "8001"]
     depends_on:
       chromadb:
@@ -210,7 +158,6 @@ services:
     ports:
       - "8501:8501"
     environment:
-      # Point to the containerized RAG API service
       - API_HOST=rag-api
       - API_PORT=8001
     depends_on:
