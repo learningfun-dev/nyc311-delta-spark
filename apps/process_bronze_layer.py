@@ -3,19 +3,12 @@
 '''
 import os
 from pyspark.sql.types import StructField, StructType, StringType, DoubleType, TimestampType
+import glob
 from constant import constants
-from pystyle import Colors, Colorate
 from utils.spark_utils import get_spark_session
+from utils.logging_utils import get_logger
 
-
-def main():
-    '''
-        the main entry point for the application
-    '''
-
-    print(Colorate.Vertical(Colors.blue_to_green, """
-
-
+BRONZE_BANNER = """
 ▀█████████▄     ▄████████  ▄██████▄  ███▄▄▄▄    ▄███████▄     ▄████████       ▄█          ▄████████ ▄██   ▄      ▄████████    ▄████████ 
   ███    ███   ███    ███ ███    ███ ███▀▀▀██▄ ██▀     ▄██   ███    ███      ███         ███    ███ ███   ██▄   ███    ███   ███    ███ 
   ███    ███   ███    ███ ███    ███ ███   ███       ▄███▀   ███    █▀       ███         ███    ███ ███▄▄▄███   ███    █▀    ███    ███ 
@@ -25,21 +18,27 @@ def main():
   ███    ███   ███    ███ ███    ███ ███   ███ ███▄     ▄█   ███    ███      ███▌    ▄   ███    ███ ███   ███   ███    ███   ███    ███ 
 ▄█████████▀    ███    ███  ▀██████▀   ▀█   █▀   ▀████████▀   ██████████      █████▄▄██   ███    █▀   ▀█████▀    ██████████   ███    ███ 
                ███    ███                                                    ▀                                               ███    ███ 
+"""
 
-
-    """, 1))
-
-
+def main():
+    '''
+        the main entry point for the application
+    '''
     # Initialize SparkSession
     spark = get_spark_session(constants.BRONZE_APP_NAME)
+    logger = get_logger(spark, "Bronze Layer")
 
-    print("{:*<120}".format("*"))
-    print("{: ^120}".format("1. BRONZE LAYER PROCESSING: Convert CSV to Delta Format"))
-    print("{:*<120}".format("*"))
+    logger.info(f"Spark Master in use: {spark.sparkContext.master}")
+    logger.info(BRONZE_BANNER)
+    logger.info("--- Starting Bronze Layer Processing ---")
 
     try:
-        if os.path.exists(constants.BRONZE_INPUT_FILE_PATH):
-            print("Bronze layer: input file exists")
+        # Assuming BRONZE_INPUT_FILE_PATH points to the 'data/raw' directory
+        input_path = constants.BRONZE_INPUT_FILE_PATH
+        # Check if the directory exists and contains any CSV files
+        csv_files = glob.glob(os.path.join(input_path, "*.csv"))
+        if os.path.isdir(input_path) and csv_files:
+            logger.info(f"Input directory found at {input_path} with {len(csv_files)} CSV files.")
 
             input_csv_file_schema = StructType([
                 StructField("unique_key", StringType(), True),
@@ -89,18 +88,18 @@ def main():
                 StructField("location_state", StringType(), True),
             ])
 
-            print("Bronze layer: reading CSV file")
-            # Read CSV File
+            logger.info(f"Reading all CSV files from {input_path}")
+            # Read all CSV files from the directory
             bronze_df = (
                 spark.read
                 .format("csv")
                 .option("header", True)
                 .option("inferSchema", False)
                 .schema(input_csv_file_schema)
-                .load(constants.BRONZE_INPUT_FILE_PATH)
+                .load(input_path)
                 )
 
-            print("Bronze layer: writing delta table")
+            logger.info(f"Writing bronze delta table to {constants.BRONZE_OUTPUT_FILE_PATH}")
             # transform into Delta Lake
             (
                 bronze_df.write
@@ -108,12 +107,16 @@ def main():
                 .mode("overwrite")
                 .save(constants.BRONZE_OUTPUT_FILE_PATH)
             )
+            logger.info("Successfully converted CSV to Delta format.")
 
         else:
-            print("Bronze layer input file does not exists")
+            logger.error(f"Input directory does not exist or contains no CSV files at {input_path}")
+    except Exception as e:
+        logger.error(f"An error occurred during Bronze Layer processing: {e}", exc_info=True)
+        raise
     finally:
         # Stop the SparkSession
-        print("Stopping Spark session.")
+        logger.info("--- Bronze Layer Processing Finished ---")
         spark.stop()
 
 

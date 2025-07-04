@@ -22,6 +22,11 @@ services:
       - "4040:4040"
     volumes:
       - ./data:/opt/bitnami/spark/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     depends_on:
       zookeeper:
         condition: service_started
@@ -42,9 +47,14 @@ services:
       - "5055:4040"
     volumes:
       - ./data:/opt/bitnami/spark/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     depends_on:
       spark-master-1:
-        condition: service_started
+        condition: service_healthy
       zookeeper:
         condition: service_started
       chromadb:
@@ -67,9 +77,9 @@ services:
       - ./data:/opt/bitnami/spark/data
     depends_on:
       spark-master-1:
-        condition: service_started
+        condition: service_healthy
       spark-master-2:
-        condition: service_started
+        condition: service_healthy
 
   spark-worker-2:
     build:
@@ -88,9 +98,9 @@ services:
       - ./data:/opt/bitnami/spark/data
     depends_on:
       spark-master-1:
-        condition: service_started
+        condition: service_healthy
       spark-master-2:
-        condition: service_started
+        condition: service_healthy
 
   spark-worker-3:
     build:
@@ -109,9 +119,9 @@ services:
       - ./data:/opt/bitnami/spark/data
     depends_on:
       spark-master-1:
-        condition: service_started
+        condition: service_healthy
       spark-master-2:
-        condition: service_started
+        condition: service_healthy
 
   chromadb:
     build:

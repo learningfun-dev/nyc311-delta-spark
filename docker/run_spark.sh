@@ -18,10 +18,14 @@ DELTA_JARS=$(find "$DELTA_JARS_DIR" -name "*.jar" | paste -sd "," -)
 echo "✅ Submitting Spark job: $APP_PATH"
 echo "📦 Delta JARs: $DELTA_JARS"
 
+LOG4J_PROPERTIES_PATH="/opt/bitnami/spark/log4j2.properties"
+
 spark-submit \
   --master spark://spark-master-1:7077,spark-master-2:7077 \
   --deploy-mode client \
   --jars "$DELTA_JARS" \
+  --conf "spark.driver.extraJavaOptions=-Dlog4j.configurationFile=file:$LOG4J_PROPERTIES_PATH" \
+  --conf "spark.executor.extraJavaOptions=-Dlog4j.configurationFile=file:$LOG4J_PROPERTIES_PATH" \
   --conf spark.sql.extensions=io.delta.sql.DeltaSparkSessionExtension \
   --conf spark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog \
   --conf spark.sql.execution.arrow.pyspark.enabled=true \

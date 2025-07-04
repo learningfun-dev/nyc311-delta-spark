@@ -4,18 +4,10 @@
 import os
 from pyspark.sql.functions import col, to_timestamp, month, year
 from constant import constants
-from pystyle import Colors, Colorate
 from utils.spark_utils import get_spark_session
+from utils.logging_utils import get_logger
 
-
-def main():
-    '''
-        the main entry point for the application
-    '''
-
-    print(Colorate.Vertical(Colors.blue_to_green, """
-
-
+SILVER_BANNER = """
    ▄████████  ▄█   ▄█        ▄█    █▄     ▄████████    ▄████████       ▄█          ▄████████ ▄██   ▄      ▄████████    ▄████████ 
   ███    ███ ███  ███       ███    ███   ███    ███   ███    ███      ███         ███    ███ ███   ██▄   ███    ███   ███    ███ 
   ███    █▀  ███▌ ███       ███    ███   ███    █▀    ███    ███      ███         ███    ███ ███▄▄▄███   ███    █▀    ███    ███ 
@@ -25,20 +17,25 @@ def main():
    ▄█    ███ ███  ███▌    ▄ ███    ███   ███    ███   ███    ███      ███▌    ▄   ███    ███ ███   ███   ███    ███   ███    ███ 
  ▄████████▀  █▀   █████▄▄██  ▀██████▀    ██████████   ███    ███      █████▄▄██   ███    █▀   ▀█████▀    ██████████   ███    ███ 
                   ▀                                   ███    ███      ▀                                               ███    ███ 
+"""
 
-    """, 1))
+def main():
+    '''
+        the main entry point for the application
+    '''
     # Initialize SparkSession
     spark = get_spark_session(constants.SILVER_APP_NAME)
+    logger = get_logger(spark, "Silver Layer")
 
-    print("{:*<120}".format("*"))
-    print("{: ^120}".format("2. SILVER LAYER PROCESSING: Data Cleaning and adding columns"))
-    print("{:*<120}".format("*"))
+    logger.info(f"Spark Master in use: {spark.sparkContext.master}")
+    logger.info(SILVER_BANNER)
+    logger.info("--- Starting Silver Layer Processing ---")
 
     try:
         if os.path.exists(constants.SILVER_INPUT_FILE_PATH):
-            print("Silver layer: input file exists")
+            logger.info(f"Input file found at {constants.SILVER_INPUT_FILE_PATH}")
 
-            print("Silver layer: reading input delta table")
+            logger.info(f"Reading bronze delta table from {constants.SILVER_INPUT_FILE_PATH}")
             #  Read Delta Table
             silver_df = ( spark.read
                 .format("delta")
@@ -53,7 +50,7 @@ def main():
                 .dropDuplicates(["unique_key"])
             )
 
-            print("Silver layer: writing output delta table")
+            logger.info(f"Writing silver delta table to {constants.SILVER_OUTPUT_FILE_PATH}")
             # Save to a delta table with partitions
             (
                 silver_df.write
@@ -62,12 +59,16 @@ def main():
                 .partitionBy("year","month")
                 .save(constants.SILVER_OUTPUT_FILE_PATH)
             )
+            logger.info("Successfully cleaned data and created Silver layer.")
 
         else:
-            print("Silver layer input file does not exists")
+            logger.error(f"Input file does not exist at {constants.SILVER_INPUT_FILE_PATH}")
+    except Exception as e:
+        logger.error(f"An error occurred during Silver Layer processing: {e}", exc_info=True)
+        raise
     finally:
         # Stop the SparkSession
-        print("Stopping Spark session.")
+        logger.info("--- Silver Layer Processing Finished ---")
         spark.stop()
 
 

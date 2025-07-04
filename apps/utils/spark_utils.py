@@ -45,6 +45,4 @@ def get_spark_session(app_name: str) -> SparkSession:
     spark = spark_builder.getOrCreate()
     spark.conf.set("spark.sql.debug.maxToStringFields", 1000)
 
-    print("✅ Spark Master in use:", spark.sparkContext.master)
-
     return spark

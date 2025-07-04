@@ -29,6 +29,7 @@ ENV HOME=/opt/bitnami/spark
 
 # Copy app code and make it importable
 COPY ./apps ./apps
+COPY log4j2.properties ./apps/log4j2.properties
 ENV PYTHONPATH "${PYTHONPATH}:/opt/bitnami/spark/apps"
 
 # Add spark user entry

@@ -19,12 +19,9 @@ HOME = os.getenv("HOME", "/opt/bitnami/spark") # Home directory inside the conta
 SHARED_DIRECTORY = os.getenv("SHARED_DIRECTORY", os.path.join(PROJECT_ROOT, "data"))
 OUTPUT_FILE_NAME = "311_service_requests/"
 
-# input file
-INPUT_FILE_NAME = os.getenv("INPUT_FILE_NAME", "erm2-nwe9_version_176301.csv") # use for end to end final output
-
 # Bronze  constants
 BRONZE_APP_NAME = APP_NAME + ":Bronze"
-BRONZE_INPUT_FILE_PATH = os.path.join(SHARED_DIRECTORY, "raw", INPUT_FILE_NAME)
+BRONZE_INPUT_FILE_PATH = os.path.join(SHARED_DIRECTORY, "raw")
 BRONZE_OUTPUT_FILE_PATH = os.path.join(SHARED_DIRECTORY, "bronze",  OUTPUT_FILE_NAME)
 
 
