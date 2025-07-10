@@ -158,18 +158,64 @@ services:
     depends_on:
       chromadb:
         condition: service_healthy
-
-  streamlit-app:
+  
+  streamlit-app-1:
     build:
       context: .
       dockerfile: docker/dockerfile_streamlit
-    container_name: streamlit-app
+    container_name: streamlit-app-1
     profiles: [rag, all]
+    env_file:
+      - compose.env
     ports:
       - "8501:8501"
+    command: ["apps/streamlit_app_1.py", "--server.port=8501", "--server.headless=true"]
+    depends_on:
+      spark-master-1:
+        condition: service_healthy
+      zookeeper:
+        condition: service_started
+      chromadb:
+        condition: service_healthy
+
+  streamlit-app-2:
+    build:
+      context: .
+      dockerfile: docker/dockerfile_streamlit
+    container_name: streamlit-app-2
+    profiles: [rag, all]
+    ports:
+      - "8502:8501"
     environment:
       - API_HOST=rag-api
       - API_PORT=8001
+    command: ["apps/streamlit_app_2.py", "--server.port=8501", "--server.headless=true"]
     depends_on:
       rag-api:
         condition: service_started
+
+  streamlit-app-3:
+    build:
+      context: .
+      dockerfile: docker/dockerfile_streamlit
+    container_name: streamlit-app-3
+    profiles: [rag, all]
+    ports:
+      - "8503:8501"
+    env_file:
+      - compose.env
+    environment:
+      - API_HOST=rag-api
+      - API_PORT=8001
+    command: ["apps/streamlit_app_3.py", "--server.port=8501", "--server.headless=true"]
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      rag-api:
+        condition: service_started
+      spark-master-1:
+        condition: service_healthy
+      zookeeper:
+        condition: service_started
+      chromadb:
+        condition: service_healthy

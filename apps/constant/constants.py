@@ -41,6 +41,7 @@ GOLD_OUTPUT_FILE_PATH_BY_BOROUGH = os.path.join(SHARED_DIRECTORY, "gold",  "by_b
 # EMBEDDING constants
 EMBEDDING_APP_NAME = APP_NAME + ":Embedding"
 EMBEDDING_PATH_TOP_COMPLAINTS = GOLD_OUTPUT_FILE_PATH_TOP_COMPLAINTS
+EMBEDDING_PATH_CHECKPOINT_TOP_COMPLAINTS = os.path.join(SHARED_DIRECTORY, "embedding",  "top_complaints")
 EMBEDDING_PATH_BY_BOROUGH = GOLD_OUTPUT_FILE_PATH_BY_BOROUGH
 EMBEDDING_COLLECTION_NAME = "nyc_311_gold"
 EMBEDDING_CHROMA_HOST = os.getenv("EMBEDDING_CHROMA_HOST", "localhost")
@@ -58,7 +59,7 @@ LOCAL_LLM_MODEL = os.getenv("LOCAL_LLM_MODEL", "llama3:instruct")
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 
 # streamlit_app constants
-STREAMLIT_APP_NAME = APP_NAME + ":Streamlit"
+STREAMLIT_APP_1_NAME = APP_NAME + ":StreamlitCharts"
 API_HOST = os.getenv("API_HOST", "localhost")
 API_PORT = int(os.getenv("API_PORT", 8001))
 API_URL = f"http://{API_HOST}:{API_PORT}/stream_chat"

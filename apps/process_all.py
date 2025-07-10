@@ -5,7 +5,7 @@
 import process_bronze_layer
 import process_silver_layer
 import process_gold_layer
-import process_embedding
+import process_embedding_layer
 
 def main():
     '''
@@ -14,7 +14,7 @@ def main():
     process_bronze_layer.main()
     process_silver_layer.main()
     process_gold_layer.main()
-    process_embedding.main()
+    process_embedding_layer.main()
 
 if __name__ == "__main__":
     main()

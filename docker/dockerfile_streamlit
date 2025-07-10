@@ -9,12 +9,15 @@ COPY requirements/streamlit.txt ./requirements.txt
 # Install all Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the application code into the working directory
-COPY ./apps/streamlit_app.py ./apps/
+# Copy app code and make it importable
+COPY ./apps ./apps
+COPY log4j2.properties ./apps/log4j2.properties
+ENV PYTHONPATH "${PYTHONPATH}:/opt/bitnami/spark/apps"
 
 # Add the application's directory to PYTHONPATH
 ENV PYTHONPATH "${PYTHONPATH}:/app"
 
 # Expose the port the app runs on and define the command to run it
 EXPOSE 8501
-CMD ["streamlit", "run", "apps/streamlit_app.py", "--server.port=8501", "--server.address=0.0.0.0"]
+ENTRYPOINT ["streamlit", "run"]
+CMD ["apps/streamlit_app_1.py", "--server.port=8501", "--server.headless=true"]
