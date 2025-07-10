@@ -213,7 +213,7 @@ services:
       - API_HOST=rag-api
       - API_PORT=8001      
       - SPARK_MASTER_URL=spark://spark-master-1:7077
-      - SPARK_DRIVER_HOST=streamlit-app-1
+      - SPARK_DRIVER_HOST=streamlit-app-3
     command: ["apps/streamlit_app_3.py", "--server.port=8501", "--server.headless=true"]
     volumes:
       - ./data:/opt/bitnami/spark/data

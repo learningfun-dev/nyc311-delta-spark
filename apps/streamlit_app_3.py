@@ -43,7 +43,6 @@ TEXT_TO_SQL_TEMPLATE = """
 You are an expert Spark SQL data analyst. Your task is to convert a user's question into a valid Spark SQL query.
 You can only query the tables provided in the schema information below.
 Do not use any tables that are not listed. The available tables are `top_complaints` and `by_borough`.
-Always wrap table and column names in backticks (`) if they contain spaces or are keywords.
 The user's question might be conversational. Your generated query should be directly executable.
 Only output the SQL query and nothing else. Do not add explanations, introductory text, or markdown formatting.
 
