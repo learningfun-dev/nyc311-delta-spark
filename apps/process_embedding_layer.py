@@ -47,12 +47,19 @@ def _upsert_partition_to_chromadb(iterator: iter) -> None:
         if not batch:
             break
 
-        ids_to_upsert = [row.id for row in batch]
-        documents_to_upsert = [row.document for row in batch]
+        # Filter out rows with null/empty IDs or documents before processing.
+        valid_batch = [row for row in batch if row.id and row.document and row.document.strip()]
+        
+        if not valid_batch:
+            print("Skipping batch as it contains no valid documents after filtering.", file=sys.stderr)
+            continue
+
+        ids_to_upsert = [row.id for row in valid_batch]
+        documents_to_upsert = [row.document for row in valid_batch]
         metadatas_to_upsert = [
             # Filter out None values from metadata, as ChromaDB does not support them.
             {k: v for k, v in row.asDict().items() if k not in ['id', 'document'] and v is not None}
-            for row in batch
+            for row in valid_batch
         ]
 
         print(f"Upserting batch of {len(ids_to_upsert)} documents from a partition.", file=sys.stderr)
@@ -69,7 +76,7 @@ def main() -> None:
     logger.info(EMBEDDING_BANNER)
     logger.info("--- Starting Embedding Layer Streaming Processing ---")
     
-    checkpoint_path = os.path.join(os.path.dirname(constants.EMBEDDING_PATH_CHECKPOINT_TOP_COMPLAINTS), "checkpoints/embedding_streaming")
+    checkpoint_path = os.path.join(os.path.dirname(constants.EMBEDDING_PATH), "checkpoints/embedding_streaming")
 
     try:
         # 1. Read from both gold Delta tables as streams
@@ -78,7 +85,7 @@ def main() -> None:
 
         # 2. Transform each stream to create documents and ensure schema compatibility
         top_complaints_docs = top_complaints_stream.withColumn(
-            "document", concat_ws(" ", lit("In month"), col("month"), lit("of year"), col("year"), lit("the complaint type"), col("complaint_type"), lit("had"), col("count"), lit("reports."))
+            "document", concat_ws(" ", lit("In month"), col("month"), lit("of year"), col("year"), lit("the complaint type"), coalesce(col("complaint_type"), lit("unknown_complaint")), lit("had"), col("count"), lit("reports."))
         ).withColumn(
             "id", concat_ws("-", lit("complaint"), col("year"), col("month"), sha2(coalesce(col("complaint_type"), lit("unknown_complaint")), 256))
         ).withColumn("source", lit("top_complaints")).withColumn("borough", lit(None).cast("string"))
@@ -89,12 +96,8 @@ def main() -> None:
             "id", concat_ws("-", lit("borough"), col("year"), col("month"), sha2(coalesce(col("borough"), lit("unknown_borough")), 256))
         ).withColumn("source", lit("by_borough")).withColumn("complaint_type", lit(None).cast("string"))
 
-        # 3. Union the two streams into one
-        all_docs_stream = top_complaints_docs.select(
-            "id", "document", "year", "month", "count", "complaint_type", "borough", "source"
-        ).unionByName(by_borough_docs.select(
-            "id", "document", "year", "month", "count", "complaint_type", "borough", "source"
-        ))
+        # 3. Union the two streams into one (Simplified)
+        all_docs_stream = top_complaints_docs.unionByName(by_borough_docs)
 
         # 4. Define the function to be executed on each micro-batch
         def upsert_micro_batch(micro_batch_df, batch_id):
