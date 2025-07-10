@@ -162,14 +162,19 @@ services:
   streamlit-app-1:
     build:
       context: .
-      dockerfile: docker/dockerfile_streamlit
+      dockerfile: docker/dockerfile_spark_streamlit
     container_name: streamlit-app-1
     profiles: [rag, all]
     env_file:
       - compose.env
+    environment:
+      - SPARK_MASTER_URL=spark://spark-master-1:7077
+      - SPARK_DRIVER_HOST=streamlit-app-1
     ports:
       - "8501:8501"
     command: ["apps/streamlit_app_1.py", "--server.port=8501", "--server.headless=true"]
+    volumes:
+      - ./data:/opt/bitnami/spark/data
     depends_on:
       spark-master-1:
         condition: service_healthy
@@ -197,7 +202,7 @@ services:
   streamlit-app-3:
     build:
       context: .
-      dockerfile: docker/dockerfile_streamlit
+      dockerfile: docker/dockerfile_spark_streamlit
     container_name: streamlit-app-3
     profiles: [rag, all]
     ports:
@@ -206,10 +211,12 @@ services:
       - compose.env
     environment:
       - API_HOST=rag-api
-      - API_PORT=8001
+      - API_PORT=8001      
+      - SPARK_MASTER_URL=spark://spark-master-1:7077
+      - SPARK_DRIVER_HOST=streamlit-app-1
     command: ["apps/streamlit_app_3.py", "--server.port=8501", "--server.headless=true"]
     volumes:
-      - ./data:/app/data
+      - ./data:/opt/bitnami/spark/data
     depends_on:
       rag-api:
         condition: service_started

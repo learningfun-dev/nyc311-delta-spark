@@ -9,7 +9,7 @@ PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..
 APP_NAME = "NYC-311"
 
 # Core Configuration - Override with environment variables
-SPARK_MASTER = os.getenv("SPARK_MASTER_URL", "spark://localhost:7077")
+SPARK_MASTER_URL = os.getenv("SPARK_MASTER_URL", "spark://localhost:7077")
 
 SPARK_DRIVER_HOST = os.getenv("SPARK_DRIVER_HOST", "localhost")
 SPARK_DRIVER_PORT = int(os.getenv("SPARK_DRIVER_PORT", "25333"))

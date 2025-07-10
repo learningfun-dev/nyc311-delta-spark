@@ -25,7 +25,7 @@ def get_spark_session(app_name: str) -> SparkSession:
 
     # Only set master if not running under spark-submit
     if not os.environ.get("PYSPARK_SUBMIT_ARGS"):
-        spark_builder = spark_builder.master(constants.SPARK_MASTER)
+        spark_builder = spark_builder.master(constants.SPARK_MASTER_URL)
 
     spark_builder = (
         spark_builder

@@ -4,6 +4,28 @@ FROM python:3.12-slim
 # Set the working directory inside the container
 WORKDIR /app
 
+# --- Spark 4.0 Compatibility ---
+
+# 1. Install Java 17 (required by Spark 4.0)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends openjdk-17-jre-headless \
+    && rm -rf /var/lib/apt/lists/*
+
+# 2. Set JAVA_HOME so Spark can find the Java installation
+ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+
+# 3. Set SPARK_HOME to tell PySpark where the Spark distribution is.
+#    This is the MOST LIKELY FIX for your error.
+#    You mentioned your Spark installation is at /opt/bitnami/spark.
+#    This path is often mounted from the host into the container.
+ENV SPARK_HOME=/opt/bitnami/spark
+
+# 4. Add Spark's bin directory to the system's PATH
+ENV PATH=$PATH:$SPARK_HOME/bin
+
+# --- End of Spark Configuration ---
+
+# Copy your requirements file
 COPY requirements/streamlit.txt ./requirements.txt
 
 # Install all Python dependencies
@@ -12,12 +34,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy app code and make it importable
 COPY ./apps ./apps
 COPY log4j2.properties ./apps/log4j2.properties
-ENV PYTHONPATH "${PYTHONPATH}:/opt/bitnami/spark/apps"
 
-# Add the application's directory to PYTHONPATH
-ENV PYTHONPATH "${PYTHONPATH}:/app"
+# This PYTHONPATH is correct as it points to your apps and the Spark python libs
+ENV PYTHONPATH "${PYTHONPATH}:${SPARK_HOME}/python:/app"
 
-# Expose the port the app runs on and define the command to run it
+# Expose the port the app runs on
 EXPOSE 8501
+
+# Define the command to run the app
 ENTRYPOINT ["streamlit", "run"]
 CMD ["apps/streamlit_app_1.py", "--server.port=8501", "--server.headless=true"]

@@ -5,5 +5,5 @@ langchain-community
 ollama # This is the ollama client, which can be kept.
 langchain-chroma
 langchain-ollama
-pyspark==3.5.5
+pyspark==4.0.0
 pandas
