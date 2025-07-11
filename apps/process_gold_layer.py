@@ -1,72 +1,129 @@
 '''
-    Gold Layer processing
+    Gold Layer Streaming Processing
 '''
 import os
-from pyspark.sql import SparkSession
 from pyspark.sql.functions import col
-from delta.pip_utils import configure_spark_with_delta_pip
+from delta.tables import DeltaTable
+from utils.spark_utils import get_spark_session
+from utils.logging_utils import get_logger
 from constant import constants
 
+GOLD_BANNER = """
+   ▄██████▄   ▄██████▄   ▄█       ████████▄        ▄█          ▄████████ ▄██   ▄      ▄████████    ▄████████ 
+  ███    ███ ███    ███ ███       ███   ▀███      ███         ███    ███ ███   ██▄   ███    ███   ███    ███ 
+  ███    █▀  ███    ███ ███       ███    ███      ███         ███    ███ ███▄▄▄███   ███    █▀    ███    ███ 
+ ▄███        ███    ███ ███       ███    ███      ███         ███    ███ ▀▀▀▀▀▀███  ▄███▄▄▄      ▄███▄▄▄▄██▀ 
+▀▀███ ████▄  ███    ███ ███       ███    ███      ███       ▀███████████ ▄██   ███ ▀▀███▀▀▀     ▀▀███▀▀▀▀▀   
+  ███    ███ ███    ███ ███       ███    ███      ███         ███    ███ ███   ███   ███    █▄  ▀███████████ 
+  ███    ███ ███    ███ ███▌    ▄ ███   ▄███      ███▌    ▄   ███    ███ ███   ███   ███    ███   ███    ███ 
+  ████████▀   ▀██████▀  █████▄▄██ ████████▀       █████▄▄██   ███    █▀   ▀█████▀    ██████████   ███    ███ 
+                        ▀                         ▀                                               ███    ███ 
+"""
 
 def main():
     '''
-        the main entry point for the application
+    The main entry point for the streaming application.
     '''
-
     # Initialize SparkSession
-    spark = (
-    SparkSession
-    .builder.master(constants.SPARK_MASTER)
-    .appName(constants.GOLD_APP_NAME)
-    .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
-    .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog")
-    )
+    spark = get_spark_session(constants.GOLD_APP_NAME)
+    logger = get_logger(spark, "Gold Layer Streaming")
 
-    spark = configure_spark_with_delta_pip(spark).getOrCreate()
-    spark.conf.set("spark.sql.debug.maxToStringFields", 1000)
+    logger.info(f"Spark Master in use: {spark.sparkContext.master}")
+    logger.info(GOLD_BANNER)
+    logger.info("--- Starting Gold Layer Streaming Processing ---")
 
-    print("""
-        # ********************************************************************************
-        # 3. GOLD LAYER PROCESSING: Data Aggregation
-        # ********************************************************************************
-        """)
+    try:
+        silver_path = constants.GOLD_INPUT_FILE_PATH
+        top_complaints_path = constants.GOLD_OUTPUT_FILE_PATH_TOP_COMPLAINTS
+        by_borough_path = constants.GOLD_OUTPUT_FILE_PATH_BY_BOROUGH
+        # A single checkpoint for the input stream
+        checkpoint_path = os.path.join(os.path.dirname(top_complaints_path), "checkpoints/gold_streaming")
 
-    if os.path.exists(constants.GOLD_INPUT_FILE_PATH):
-        print("Gold layer: input file exists")
-        print("Gold layer: reading input delta table")
-        gold_df = ( spark.read
+        if not DeltaTable.isDeltaTable(spark, silver_path):
+            logger.error(f"Silver table not found at {silver_path}. Please run the silver layer first.")
+            return
+
+        # 1. Read data from the silver Delta table as a stream
+        silver_stream_df = (
+            spark.readStream
             .format("delta")
-            .load(constants.GOLD_INPUT_FILE_PATH)
+            .option("ignoreDeletes", "true")
+            .load(silver_path)
         )
 
+        # Function to perform aggregations and upserts for each micro-batch
+        def process_aggregates(micro_batch_df, batch_id):
+            logger.info(f"--- Processing Micro-Batch ID: {batch_id} ---")
 
-        # top_complaints
-        top_complaints = gold_df.groupBy("complaint_type","year","month").count().orderBy(col("count").desc())
+            if micro_batch_df.rdd.isEmpty():
+                logger.info("Micro-batch is empty, skipping.")
+                return
 
-        print("Gold layer: writing output delta table top_complaints")
-        (
-            top_complaints.write
-            .format("delta")
-            .mode("overwrite")
-            .save(constants.GOLD_OUTPUT_FILE_PATH_TOP_COMPLAINTS)
+            # Cache the micro-batch to avoid re-reading from source for each aggregation
+            micro_batch_df.cache()
+            
+            # --- Process top_complaints ---
+            logger.info("Aggregating new data for top complaints.")
+            new_top_complaints = micro_batch_df.groupBy("complaint_type", "year", "month").count()
+
+            # Merge into the 'top_complaints' gold table
+            if DeltaTable.isDeltaTable(spark, top_complaints_path):
+                gold_top_complaints_table = DeltaTable.forPath(spark, top_complaints_path)
+                (gold_top_complaints_table.alias("target")
+                 .merge(new_top_complaints.alias("source"), 
+                        "target.year = source.year AND target.month = source.month AND target.complaint_type = source.complaint_type")
+                 .whenMatchedUpdate(set={"count": col("target.count") + col("source.count")})
+                 .whenNotMatchedInsertAll()
+                 .execute())
+            else:
+                (new_top_complaints.write.format("delta").mode("overwrite").save(top_complaints_path))
+            
+            logger.info(f"Successfully merged into {top_complaints_path}")
+
+            # --- Process by_borough ---
+            logger.info("Aggregating new data by borough.")
+            new_by_borough = micro_batch_df.groupBy("borough", "year", "month").count()
+
+            # Merge into the 'by_borough' gold table
+            if DeltaTable.isDeltaTable(spark, by_borough_path):
+                gold_by_borough_table = DeltaTable.forPath(spark, by_borough_path)
+                (gold_by_borough_table.alias("target")
+                 .merge(new_by_borough.alias("source"), 
+                        "target.year = source.year AND target.month = source.month AND target.borough <=> source.borough")
+                 .whenMatchedUpdate(set={"count": col("target.count") + col("source.count")})
+                 .whenNotMatchedInsertAll()
+                 .execute())
+            else:
+                (new_by_borough.write.format("delta").mode("overwrite").save(by_borough_path))
+
+            logger.info(f"Successfully merged into {by_borough_path}")
+
+            # Unpersist the cached DataFrame
+            micro_batch_df.unpersist()
+            logger.info(f"--- Finished processing Micro-Batch ID: {batch_id} ---")
+
+
+        # 2. Define and start the streaming query
+        logger.info("Starting stream to process gold layer aggregates.")
+        query = (
+            silver_stream_df.writeStream
+            .foreachBatch(process_aggregates)
+            .outputMode("update")
+            .option("checkpointLocation", checkpoint_path)
+            .trigger(availableNow=True) # Processes all available data in a single batch and then stops.
+            .start()
         )
 
-        # by_borough
-        by_borough = gold_df.groupBy("borough","year","month").count()
+        # 3. Wait for the streaming query to terminate
+        query.awaitTermination()
 
-        print("Gold layer: writing output delta table by_borough")
-        (
-            by_borough.write
-            .format("delta")
-            .mode("overwrite")
-            .save(constants.GOLD_OUTPUT_FILE_PATH_BY_BOROUGH)
-        )
-
-    else:
-        print("Gold layer input file does not exists")
-
-    # Stop the SparkSession
-    spark.stop()
+    except Exception as e:
+        logger.error(f"An error occurred during Gold Layer streaming processing: {e}", exc_info=True)
+        raise
+    finally:
+        # Stop the SparkSession
+        logger.info("--- Gold Layer Streaming Processing Finished ---")
+        spark.stop()
 
 
 if __name__ == "__main__":

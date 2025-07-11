@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+chromadb
+langchain-core
+langchain-chroma
+langchain-ollama
+ollama

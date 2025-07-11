@@ -1,40 +1,46 @@
 '''
-    Process bronze layer
+    Bronze Layer Streaming Processing
 '''
 import os
-from pyspark.sql import SparkSession
 from pyspark.sql.types import StructField, StructType, StringType, DoubleType, TimestampType
-from delta.pip_utils import configure_spark_with_delta_pip
 from constant import constants
+from utils.spark_utils import get_spark_session
+from utils.logging_utils import get_logger
 
+BRONZE_BANNER = """
+▀█████████▄     ▄████████  ▄██████▄  ███▄▄▄▄    ▄███████▄     ▄████████       ▄█          ▄████████ ▄██   ▄      ▄████████    ▄████████ 
+  ███    ███   ███    ███ ███    ███ ███▀▀▀██▄ ██▀     ▄██   ███    ███      ███         ███    ███ ███   ██▄   ███    ███   ███    ███ 
+  ███    ███   ███    ███ ███    ███ ███   ███       ▄███▀   ███    █▀       ███         ███    ███ ███▄▄▄███   ███    █▀    ███    ███ 
+ ▄███▄▄▄██▀   ▄███▄▄▄▄██▀ ███    ███ ███   ███  ▀█▀▄███▀▄▄  ▄███▄▄▄          ███         ███    ███ ▀▀▀▀▀▀███  ▄███▄▄▄      ▄███▄▄▄▄██▀ 
+▀▀███▀▀▀██▄  ▀▀███▀▀▀▀▀   ███    ███ ███   ███   ▄███▀   ▀ ▀▀███▀▀▀          ███       ▀███████████ ▄██   ███ ▀▀███▀▀▀     ▀▀███▀▀▀▀▀   
+  ███    ██▄ ▀███████████ ███    ███ ███   ███ ▄███▀         ███    █▄       ███         ███    ███ ███   ███   ███    █▄  ▀███████████ 
+  ███    ███   ███    ███ ███    ███ ███   ███ ███▄     ▄█   ███    ███      ███▌    ▄   ███    ███ ███   ███   ███    ███   ███    ███ 
+▄█████████▀    ███    ███  ▀██████▀   ▀█   █▀   ▀████████▀   ██████████      █████▄▄██   ███    █▀   ▀█████▀    ██████████   ███    ███ 
+               ███    ███                                                    ▀                                               ███    ███ 
+"""
 
 def main():
     '''
-        the main entry point for the application
+    The main entry point for the streaming application.
     '''
-
     # Initialize SparkSession
-    spark = (
-    SparkSession
-    .builder.master(constants.SPARK_MASTER)
-    .appName(constants.BRONZE_APP_NAME)
-    .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
-    .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog")
-    )
+    spark = get_spark_session(constants.BRONZE_APP_NAME)
+    logger = get_logger(spark, "Bronze Layer Streaming")
 
-    spark = configure_spark_with_delta_pip(spark).getOrCreate()
-    spark.conf.set("spark.sql.debug.maxToStringFields", 1000)
+    logger.info(f"Spark Master in use: {spark.sparkContext.master}")
+    logger.info(BRONZE_BANNER)
+    logger.info("--- Starting Bronze Layer Streaming Processing ---")
 
-    print("""
-        # ********************************************************************************
-        # 1. BRONZE LAYER PROCESSING: Convert CSV to Delta Format
-        # ********************************************************************************
-        """)
-    if os.path.exists(constants.BRONZE_INPUT_FILE_PATH):
-        print("Bronze layer: input file exists")
+    try:
+        input_path = constants.BRONZE_INPUT_FILE_PATH
+        output_path = constants.BRONZE_OUTPUT_FILE_PATH
+        checkpoint_path = os.path.join(os.path.dirname(output_path), "checkpoints/bronze_streaming")
 
-       
+        logger.info(f"Monitoring input directory: {input_path}")
+        logger.info(f"Output will be written to Delta table at: {output_path}")
+        logger.info(f"Checkpoint directory: {checkpoint_path}")
 
+        # Define the schema for the incoming CSV files
         input_csv_file_schema = StructType([
             StructField("unique_key", StringType(), True),
             StructField("created_date", TimestampType(), True),
@@ -83,31 +89,39 @@ def main():
             StructField("location_state", StringType(), True),
         ])
 
-        print("Bronze layer: reading CSV file")
-        # Read CSV File
-        bronze_df = (
-            spark.read
+        # 1. Read data from the CSV source directory as a stream
+        # Spark will automatically discover new files added to the directory.
+        bronze_stream_df = (
+            spark.readStream
             .format("csv")
             .option("header", True)
-            .option("inferSchema", False)
             .schema(input_csv_file_schema)
-            .load(constants.BRONZE_INPUT_FILE_PATH)
-            )
-
-        print("Bronze layer: writing delta table")
-        # transform into Delta Lake
-        (
-            bronze_df.write
-            .format("delta")
-            .mode("overwrite")
-            .save(constants.BRONZE_OUTPUT_FILE_PATH)
+            .load(input_path)
         )
 
-    else:
-        print("Bronze layer input file does not exists")
+        # 2. Write the stream to a Delta Lake table
+        # The 'append' mode adds new records to the table.
+        # Checkpointing is essential for fault-tolerant, exactly-once processing.
+        query = (
+            bronze_stream_df.writeStream
+            .format("delta")
+            .outputMode("append")
+            .option("checkpointLocation", checkpoint_path)
+            .trigger(availableNow=True) # Process all available files and then stop, mimicking batch behavior.
+            .start(output_path)
+        )
 
-    # Stop the SparkSession
-    spark.stop()
+        # 3. Wait for the streaming query to terminate
+        query.awaitTermination()
+        logger.info("Successfully processed available CSV files into the bronze Delta table.")
+
+    except Exception as e:
+        logger.error(f"An error occurred during Bronze Layer streaming processing: {e}", exc_info=True)
+        raise
+    finally:
+        # Stop the SparkSession
+        logger.info("--- Bronze Layer Streaming Processing Finished ---")
+        spark.stop()
 
 
 if __name__ == "__main__":
