@@ -1,6 +1,7 @@
 """
     API to serve the RAG 2.0 application
 """
+import json
 from contextlib import asynccontextmanager
 from typing import List
 from fastapi import FastAPI
@@ -10,12 +11,11 @@ import chromadb
 from chromadb.config import Settings
 from langchain_chroma import Chroma
 from langchain_ollama import OllamaLLM
-from langchain_ollama import OllamaEmbeddings # <-- MODIFIED: New import for Ollama embeddings
+from langchain_ollama import OllamaEmbeddings
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.runnables import RunnableParallel
+from langchain_core.runnables import RunnableParallel, RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
 from .constant import constants
-from starlette.responses import StreamingResponse
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -55,27 +55,23 @@ class QueryRequest(BaseModel):
 def get_retriever():
     """
     Initializes and returns a Chroma vector store retriever.
-    Connects to the existing ChromaDB instance using settings from the constants file.
+    Connects to the existing ChromaDB instance using settings from the constants.
     """
     chroma_client = chromadb.HttpClient(
         host=constants.EMBEDDING_CHROMA_HOST, 
         port=constants.EMBEDDING_CHROMA_PORT,
         settings=Settings(anonymized_telemetry=False)
     )
-
     # Use embedding model from ollama (locally)
     embedding_function = OllamaEmbeddings(
         model=constants.EMBEDDING_MODEL,
         base_url=constants.OLLAMA_BASE_URL
     )
-    
-
     vector_store = Chroma(
         client=chroma_client,
         collection_name=constants.EMBEDDING_COLLECTION_NAME,
-        embedding_function=embedding_function, # Use the new Ollama embedding function
+        embedding_function=embedding_function,
     )
-    
     return vector_store.as_retriever(search_kwargs={"k": 5})
 
 def format_docs(docs):
@@ -92,8 +88,7 @@ def format_chat_history(chat_history: List[dict]) -> str:
         return "No previous conversation."
     return "\n".join(f"{msg['role'].capitalize()}: {msg['content']}" for msg in chat_history)
 
-
-# Initialize components from constants
+# Initialize components
 retriever = get_retriever()
 
 # --- LLM Initialization ---
@@ -124,21 +119,33 @@ retriever = get_retriever()
 #     # )
 #
 # --- Current Setup (for local development) ---
-llm = OllamaLLM(
-    model=constants.LOCAL_LLM_MODEL,
-    base_url=constants.OLLAMA_BASE_URL
-)
+llm = OllamaLLM(model=constants.LOCAL_LLM_MODEL, base_url=constants.OLLAMA_BASE_URL)
 
-# Rephrasing Prompt and Chain
-# This chain takes the user's question and rephrases it to be more specific for vector search.
+
+# --- Chains Definition ---
+
+# Rephrasing prompt to include document structure examples.
 REPHRASE_TEMPLATE = """
-Given the following conversation history and a follow-up question, rephrase the follow-up question to be a standalone query that is optimized for a vector database search.
-The standalone query should be self-contained and not require the conversation history to be understood.
+You are a search query rewriter. Your only job is to rephrase a question into a standalone, descriptive sentence for a vector database search.
+Follow the examples below exactly. Do not add any conversational text or explanations.
+
+---
+EXAMPLES:
+
+User's Question: how many heat/hot water complaints in jan 2023?
+Standalone Search Query: Reports for HEAT/HOT WATER complaints in month 1 of year 2023.
+
+User's Question: what about brooklyn?
+Standalone Search Query: Reports for complaints in the borough of BROOKLYN.
+
+User's Question: show me the top complaints for 2024
+Standalone Search Query: Top complaints for the year 2024.
+---
 
 Chat History:
 {chat_history}
 
-Follow-up Question:
+User's Question:
 {question}
 
 Standalone Search Query:
@@ -156,8 +163,7 @@ rephrase_chain = (
     | StrOutputParser()
 )
 
-
-# Final Answer Prompt
+# Final answer prompt and chain
 # This chain uses the conversation history and the retrieved context to generate the final answer.
 ANSWER_TEMPLATE = """
 You are an expert AI assistant for analyzing NYC 311 service request data.
@@ -178,44 +184,60 @@ Answer:
 """
 answer_prompt = ChatPromptTemplate.from_template(ANSWER_TEMPLATE)
 
-# The Full RAG Chain with Conversational Memory
-# This LCEL chain orchestrates the entire process:
-#   a. It takes the original question and chat history.
-#   b. It runs the rephrasing chain to generate a standalone query for retrieval.
-#   c. It uses the rephrased query to retrieve documents.
-#   d. It passes the retrieved context, original question, and chat history to the final LLM call.
-
-# This setup runs the retrieval chain in parallel with passing through the original question and history.
-setup_and_retrieval = RunnableParallel(
-    {
-        "context": rephrase_chain | retriever | format_docs,
-        "question": lambda x: x["question"],
-        "chat_history": lambda x: format_chat_history(x["chat_history"]),
-    }
-)
-
+# The full RAG chain is restored using RunnableParallel.
+# This ensures that the 'context' from the retriever and the original 'question'
+# and 'chat_history' are all passed to the final answer prompt correctly.
 rag_chain = (
-    setup_and_retrieval
+    RunnableParallel(
+        {
+            "context": rephrase_chain | retriever | format_docs,
+            "question": lambda x: x["question"],
+            "chat_history": lambda x: format_chat_history(x["chat_history"]),
+        }
+    )
     | answer_prompt
     | llm
     | StrOutputParser()
 )
 
+# A separate chain to get the source documents for debugging/display
+source_retrieval_chain = rephrase_chain | retriever
+
 @app.post("/stream_chat")
 async def stream_chat(request: QueryRequest):
-    try:
-        chat_history_dicts = [item.dict() for item in request.chat_history]
-        chain_input = {"question": request.question, "chat_history": chat_history_dicts}
+    """
+    Handles the chat request by first rephrasing the question, retrieving documents,
+    sending both to the client, and then streaming the final answer.
+    """
+    chat_history_dicts = [item.dict() for item in request.chat_history]
+    chain_input = {"question": request.question, "chat_history": chat_history_dicts}
 
-        async def wrapped_generator():
+    async def response_generator():
+        try:
+            # 1. Rephrase the question to be a standalone query
+            rephrased_question = await rephrase_chain.ainvoke(chain_input)
+            yield json.dumps({"rephrased_question": rephrased_question}) + "\n"
+
+            # 2. Retrieve documents using the rephrased question
+            retrieved_docs = await retriever.ainvoke(rephrased_question)
+            
+            source_documents_json = [
+                {"page_content": doc.page_content, "metadata": doc.metadata} 
+                for doc in retrieved_docs
+            ]
+            yield json.dumps({"source_documents": source_documents_json}) + "\n"
+
+            # 3. Stream the final answer using the full, correct rag_chain
             async for chunk in rag_chain.astream(chain_input):
-                yield chunk
-        
-        return StreamingResponse(wrapped_generator(), media_type="text/plain")
+                yield json.dumps({"answer_chunk": chunk}) + "\n"
 
-    except Exception as e:
-        print(f"ERROR: {e}")
-        raise e
+        except Exception as e:
+            print(f"ERROR in stream_chat: {e}")
+            error_payload = json.dumps({"error": str(e)}) + "\n"
+            yield error_payload
+
+    return StreamingResponse(response_generator(), media_type="text/plain")
+
 
 @app.get("/")
 def read_root():

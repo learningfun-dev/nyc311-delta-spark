@@ -35,7 +35,7 @@ You have access to the following tables. Please use the table that is most appro
     latitude DOUBLE,
     longitude DOUBLE
 )
-Description: This table contains the raw, unprocessed 311 complaint data. It has the most detail but may contain duplicates or nulls.
+Description: This bronze layer table of the ETL pipeline contains the raw, unprocessed 311 complaint data. It has the most detail but may contain duplicates or nulls.
 
 2. silver_complaints (
     unique_key STRING,
@@ -48,23 +48,23 @@ Description: This table contains the raw, unprocessed 311 complaint data. It has
     month INT,
     year INT
 )
-Description: This table contains cleaned and de-duplicated data from the bronze layer. It is the main source for aggregations.
+Description: This silver layer table of the ETL pipeline contains the cleaned and de-duplicated data from the bronze layer. It is the main source for aggregations.
 
-3. top_complaints (
+3. gold_top_complaints (
     complaint_type STRING,
     year INT,
     month INT,
     count BIGINT
 )
-Description: This table contains the total count of 311 complaints aggregated by complaint type, year, and month. Use this for questions about complaint volumes.
+Description: This gold layer table of the ETL pipeline contains the total count of 311 complaints aggregated by complaint type, year, and month. Use this for questions about complaint volumes by complaint type.
 
-4. by_borough (
+4. gold_by_borough (
     borough STRING,
     year INT,
     month INT,
     count BIGINT
 )
-Description: This table contains the total count of 311 complaints aggregated by borough, year, and month. Use this for questions about complaint volumes by location.
+Description: This gold layer table of the ETL pipeline contains the total count of 311 complaints aggregated by borough, year, and month. Use this for questions about complaint volumes by location.
 """
 
 # Create a prompt template for the Text-to-SQL conversion.
@@ -94,8 +94,8 @@ def get_cached_spark_session():
 
 def main() -> None:
     """The main entry point for the Text-to-SQL Streamlit application."""
-    st.set_page_config(page_title="NYC 311 Pipeline Debugger", layout="wide")
-    st.title("🗽 AI-Powered NYC 311 Pipeline Debugger")
+    st.set_page_config(page_title="NYC 311 Pipeline Query Executor", layout="wide")
+    st.title("🗽 AI-Powered NYC 311 Pipeline Query Executor")
     st.write(
         "Ask a question about the NYC 311 dataset. "
         "The AI will generate a Spark SQL query for you to verify, edit, and execute."
@@ -161,8 +161,8 @@ def main() -> None:
                     # --- Register all tables as temporary views ---
                     spark.read.format("delta").load(bronze_path).createOrReplaceTempView("bronze_complaints")
                     spark.read.format("delta").load(silver_path).createOrReplaceTempView("silver_complaints")
-                    spark.read.format("delta").load(top_complaints_path).createOrReplaceTempView("top_complaints")
-                    spark.read.format("delta").load(by_borough_path).createOrReplaceTempView("by_borough")
+                    spark.read.format("delta").load(top_complaints_path).createOrReplaceTempView("gold_top_complaints")
+                    spark.read.format("delta").load(by_borough_path).createOrReplaceTempView("gold_by_borough")
 
                     # Execute the potentially edited query
                     result_df = spark.sql(edited_query)
