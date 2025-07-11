@@ -23,8 +23,8 @@ The entire environment is containerized with Docker Compose, featuring a **Spark
 This project is composed of several interconnected components, from data ingestion to the final user-facing applications. The diagram below illustrates the complete workflow.
 ```mermaid
 graph TD
-    subgraph "Incremental Processing (run_pipeline_incrementally.sh)"
-        A[CSV Files in /data/input] -- "Processed one-by-one" --> B{ELT Pipeline};
+    subgraph "Incremental Processing"
+        A["./run_pipeline_incrementally.sh" <br> Iterate CSV Files in /data/input] -- "Processed one-by-one" --> B{ELT Pipeline};
     end
 
     subgraph "Data Processing Engine"
@@ -34,9 +34,9 @@ graph TD
     B -- "Executes on" --> C
 
     subgraph "Data Lakehouse (Medallion Architecture)"
-        D["Bronze Layer<br>/data/delta/bronze_nyc_311"]
-        E["Silver Layer<br>/data/delta/silver_nyc_311"]
-        F["Gold Layer<br>/data/delta/gold_*"]
+        D["Bronze Layer<br>/data/bronze/311_service_requests"]
+        E["Silver Layer<br>/data/silver/311_service_requests"]
+        F["Gold Layer<br>/data/gold/"]
     end
 
     C -- "Writes Bronze Data" --> D
@@ -85,7 +85,7 @@ This is the core data processing engine built on the Medallion Architecture.
 
 * **Bronze Layer**: Ingests raw, unaltered data from the source CSV files into a Delta table. This serves as the permanent, immutable archive of the source data.  
 * **Silver Layer**: Takes the raw data from the Bronze layer and applies cleaning, validation, and enrichment. This includes correcting data types, handling null values, removing duplicates, and creating new features like year and month for partitioning. The result is a queryable, reliable source for analytics.  
-* **Gold Layer**: Aggregates the cleaned data from the Silver layer into business-level tables optimized for reporting and analysis. This project creates two Gold tables: top\_complaints and by\_borough.
+* **Gold Layer**: Aggregates the cleaned data from the Silver layer into business-level tables optimized for reporting and analysis. This project creates two Gold tables: top_complaints and by_borough.
 
 #### **2\. Embedding Layer**
 
