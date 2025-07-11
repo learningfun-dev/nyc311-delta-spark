@@ -45,18 +45,18 @@ def main():
             # If the assistant message has source documents, display them in an expander
             if "sources" in message and message["sources"]:
                 with st.expander("Retrieved Context"):
-                    # **FIX**: Display the rephrased question that was used for retrieval
+                    # Display the rephrased question that was used for retrieval
                     if "rephrased_question" in message:
                         st.write("**Rephrased Query for Retrieval:**")
                         st.info(message["rephrased_question"])
                     
                     st.write("**Retrieved Documents:**")
                     for i, source in enumerate(message["sources"]):
-                        # **FIX**: Use 'page_content' which matches the API response key
+                        #Use 'page_content' which matches the API response key
                         st.info(f"**Source {i+1}**: {source.get('page_content', 'No document text available.')}")
 
     # --- Handle New User Input ---
-    if prompt := st.chat_input("e.g., How many noise complaints were there in Brooklyn last year?"):
+    if prompt := st.chat_input("e.g., How many complaints were there in Brooklyn for Jan 2023?"):
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
             st.markdown(prompt)
@@ -89,7 +89,7 @@ def main():
                                     answer_placeholder.markdown(full_response + "▌")
                                 if "source_documents" in data:
                                     retrieved_sources = data["source_documents"]
-                                # **FIX**: Capture the rephrased question
+                                #Capture the rephrased question
                                 if "rephrased_question" in data:
                                     rephrased_question_for_display = data["rephrased_question"]
                             except json.JSONDecodeError:
@@ -114,7 +114,7 @@ def main():
                         if retrieved_sources:
                             st.write("**Retrieved Documents:**")
                             for i, source in enumerate(retrieved_sources):
-                                # **FIX**: Use 'page_content' which matches the API response key
+                                #Use 'page_content' which matches the API response key
                                 st.info(f"**Source {i+1}**: {source.get('page_content', 'No document text available.')}")
 
             except requests.exceptions.RequestException as e:

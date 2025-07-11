@@ -6,7 +6,7 @@ import os
 from itertools import islice
 import chromadb
 from chromadb.utils import embedding_functions
-from pyspark.sql.functions import col, lit, concat_ws, sha2, coalesce
+from pyspark.sql.functions import col, lit, concat_ws, sha2, coalesce, when
 from constant import constants
 from utils.spark_utils import get_spark_session
 from utils.logging_utils import get_logger
@@ -84,14 +84,34 @@ def main() -> None:
         by_borough_stream = spark.readStream.format("delta").load(constants.EMBEDDING_PATH_BY_BOROUGH)
 
         # 2. Transform each stream to create documents and ensure schema compatibility
-        top_complaints_docs = top_complaints_stream.withColumn(
-            "document", concat_ws(" ", lit("In month"), col("month"), lit("of year"), col("year"), lit("the complaint type"), coalesce(col("complaint_type"), lit("unknown_complaint")), lit("had"), col("count"), lit("reports."))
+        
+        # --- Create a mapping from numeric month to month name ---
+        month_name_expression = (
+            when(col("month") == 1, "January")
+            .when(col("month") == 2, "February")
+            .when(col("month") == 3, "March")
+            .when(col("month") == 4, "April")
+            .when(col("month") == 5, "May")
+            .when(col("month") == 6, "June")
+            .when(col("month") == 7, "July")
+            .when(col("month") == 8, "August")
+            .when(col("month") == 9, "September")
+            .when(col("month") == 10, "October")
+            .when(col("month") == 11, "November")
+            .when(col("month") == 12, "December")
+            .otherwise("Unknown Month")
+        )
+
+        # Example document: "In January of year 2023 the complaint type HEATING had 12345 total complaints."
+        top_complaints_docs = top_complaints_stream.withColumn("month_name", month_name_expression).withColumn(
+            "document", concat_ws(" ", lit("In"), col("month_name"), lit("of year"), col("year"), lit("the complaint type"), coalesce(col("complaint_type"), lit("unknown_complaint")), lit("had"), col("count"), lit("total complaints."))
         ).withColumn(
             "id", concat_ws("-", lit("complaint"), col("year"), col("month"), sha2(coalesce(col("complaint_type"), lit("unknown_complaint")), 256))
         ).withColumn("source", lit("top_complaints")).withColumn("borough", lit(None).cast("string"))
 
-        by_borough_docs = by_borough_stream.withColumn(
-            "document", concat_ws(" ", lit("In month"), col("month"), lit("of year"), col("year"), lit("the borough of"), coalesce(col("borough"), lit("unknown_borough")), lit("had"), col("count"), lit("total 311 reports."))
+        # Example document: "In January of year 2023 the borough of STATEN ISLAND had 10636 total complaints"
+        by_borough_docs = by_borough_stream.withColumn("month_name", month_name_expression).withColumn(
+            "document", concat_ws(" ", lit("In"), col("month_name"), lit("of year"), col("year"), lit("the borough of"), coalesce(col("borough"), lit("unknown_borough")), lit("had"), col("count"), lit("total complaints"))
         ).withColumn(
             "id", concat_ws("-", lit("borough"), col("year"), col("month"), sha2(coalesce(col("borough"), lit("unknown_borough")), 256))
         ).withColumn("source", lit("by_borough")).withColumn("complaint_type", lit(None).cast("string"))

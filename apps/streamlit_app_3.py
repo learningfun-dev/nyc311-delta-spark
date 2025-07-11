@@ -18,10 +18,15 @@ from utils.spark_utils import get_spark_session
 
 # --- Constants and Configuration ---
 
-# Define the schemas of ALL tables for the LLM's context.
-# This helps the LLM generate accurate queries across the entire pipeline.
-ALL_TABLE_SCHEMAS = """
-You have access to the following tables. Please use the table that is most appropriate for the user's question.
+# Prompt to include few-shot examples and explicit instructions
+TEXT_TO_SQL_TEMPLATE = """
+You are an expert Spark SQL data analyst. Your task is to convert a user's question into a valid Spark SQL query.
+You have access to the following Delta tables. Please use the table that is most appropriate for the user's question.
+Your generated query should be directly executable in a Spark environment.
+Only output the SQL query and nothing else. Do not add explanations, introductory text, or markdown formatting.
+
+---
+SCHEMA INFORMATION:
 
 1. bronze_complaints (
     unique_key STRING,
@@ -35,7 +40,7 @@ You have access to the following tables. Please use the table that is most appro
     latitude DOUBLE,
     longitude DOUBLE
 )
-Description: This bronze layer table of the ETL pipeline contains the raw, unprocessed 311 complaint data. It has the most detail but may contain duplicates or nulls.
+Description: This bronze layer delta table contains the raw, unprocessed 311 complaint data. It has the most detail but may contain duplicates or nulls.
 
 2. silver_complaints (
     unique_key STRING,
@@ -48,7 +53,7 @@ Description: This bronze layer table of the ETL pipeline contains the raw, unpro
     month INT,
     year INT
 )
-Description: This silver layer table of the ETL pipeline contains the cleaned and de-duplicated data from the bronze layer. It is the main source for aggregations.
+Description: This silver layer delta table contains the cleaned and de-duplicated data from the bronze layer. It is the main source for aggregations.
 
 3. gold_top_complaints (
     complaint_type STRING,
@@ -56,7 +61,7 @@ Description: This silver layer table of the ETL pipeline contains the cleaned an
     month INT,
     count BIGINT
 )
-Description: This gold layer table of the ETL pipeline contains the total count of 311 complaints aggregated by complaint type, year, and month. Use this for questions about complaint volumes by complaint type.
+Description: This gold layer delta table contains the total count of 311 complaints aggregated by complaint type, year, and month. Use this for questions about complaint volumes by complaint type.
 
 4. gold_by_borough (
     borough STRING,
@@ -64,21 +69,24 @@ Description: This gold layer table of the ETL pipeline contains the total count 
     month INT,
     count BIGINT
 )
-Description: This gold layer table of the ETL pipeline contains the total count of 311 complaints aggregated by borough, year, and month. Use this for questions about complaint volumes by location.
-"""
+Description: This gold layer delta table contains the total count of 311 complaints aggregated by borough, year, and month. Use this for questions about complaint volumes by location.
 
-# Create a prompt template for the Text-to-SQL conversion.
-# This guides the LLM to generate valid Spark SQL across all tables.
-TEXT_TO_SQL_TEMPLATE = """
-You are an expert Spark SQL data analyst. Your task is to convert a user's question into a valid Spark SQL query.
-You can only query the tables provided in the schema information below.
-Do not use any tables that are not listed. The available tables are `bronze_complaints`, `silver_complaints`, `top_complaints`, and `by_borough`.
-The user's question might be conversational. Your generated query should be directly executable.
-Only output the SQL query and nothing else. Do not add explanations, introductory text, or markdown formatting.
+---
+EXAMPLES:
 
-Schema Information:
-{schema}
+User Question: "What were the top 5 complaint types in 2023?"
+Spark SQL Query:
+SELECT complaint_type, SUM(count) as total_complaints FROM gold_top_complaints WHERE year = 2023 GROUP BY complaint_type ORDER BY total_complaints DESC LIMIT 5
 
+User Question: "Are there any null complaint types in the silver table for Jan 2023?"
+Spark SQL Query:
+SELECT COUNT(*) as null_complaint_type_count FROM silver_complaints WHERE year = 2023 AND month = 1 AND complaint_type IS NULL
+
+User Question: "Show me the full details for a complaint with unique key 56789"
+Spark SQL Query:
+SELECT * FROM bronze_complaints WHERE unique_key = '56789'
+
+---
 User Question:
 {question}
 
@@ -94,8 +102,8 @@ def get_cached_spark_session():
 
 def main() -> None:
     """The main entry point for the Text-to-SQL Streamlit application."""
-    st.set_page_config(page_title="NYC 311 Pipeline Query Executor", layout="wide")
-    st.title("🗽 AI-Powered NYC 311 Pipeline Query Executor")
+    st.set_page_config(page_title="NYC 311 Pipeline Debugger", layout="wide")
+    st.title("🗽 AI-Powered NYC 311 Pipeline Debugger")
     st.write(
         "Ask a question about the NYC 311 dataset. "
         "The AI will generate a Spark SQL query for you to verify, edit, and execute."
@@ -118,6 +126,7 @@ def main() -> None:
     llm = OllamaLLM(model=constants.LOCAL_LLM_MODEL, base_url=constants.OLLAMA_BASE_URL)
 
     # Create the LangChain chain for Text-to-SQL generation.
+    # The prompt is now passed directly to the ChatPromptTemplate
     prompt_template = ChatPromptTemplate.from_template(TEXT_TO_SQL_TEMPLATE)
     sql_generation_chain = prompt_template | llm | StrOutputParser()
 
@@ -126,13 +135,14 @@ def main() -> None:
         st.session_state.sql_query = ""
 
     # Handle user input from the chat interface.
-    if user_question := st.chat_input("e.g., Show me 10 records from the silver_complaints table for Jan 2023"):
+    if user_question := st.chat_input("e.g., How many complaints were there in Feb 2024, show me the count based on borough?"):
         with st.chat_message("user"):
             st.markdown(user_question)
         
         with st.chat_message("assistant"):
             with st.spinner("Generating SQL query..."):
-                raw_generated_sql = sql_generation_chain.invoke({"schema": ALL_TABLE_SCHEMAS, "question": user_question})
+                # The schema is now part of the main template, so we don't need to pass it here.
+                raw_generated_sql = sql_generation_chain.invoke({"question": user_question})
                 
                 # Clean the generated query to remove markdown formatting
                 cleaned_sql = raw_generated_sql.strip()
@@ -140,6 +150,8 @@ def main() -> None:
                     cleaned_sql = cleaned_sql[len("```sql"):].strip()
                 if cleaned_sql.endswith("```"):
                     cleaned_sql = cleaned_sql[:-len("```")].strip()
+                if cleaned_sql.startswith("```"):
+                    cleaned_sql = cleaned_sql[len("```"):].strip()
                 
                 # Store the cleaned query in the session state
                 st.session_state.sql_query = cleaned_sql

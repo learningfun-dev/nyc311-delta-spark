@@ -48,7 +48,7 @@ def download_data_by_month():
     print(f"Starting download. Data will be saved to {OUTPUT_DIR}/")
 
     current_year = date.today().year
-    # Loop from 2010 to the current year.
+    # Loop from 2023 to the current year.
     for year in range(2023, current_year + 1):
         # Loop through each month of the year.
         for month in range(1, 13):
